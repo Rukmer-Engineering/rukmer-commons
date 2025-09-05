@@ -1,0 +1,5 @@
+aws_region = "us-east-1"
+project_name = "rukmer-commons"
+environment = "prod"
+client_domain      = ""
+allowed_origins    = ["http://localhost:4000", ""]
