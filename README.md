@@ -29,3 +29,4 @@ terraform -chdir=infrastructure plan
 ```bash
 terraform -chdir=infrastructure apply
 ```
+

@@ -12,12 +12,21 @@ locals {
 # ---------------------------------------------
 # S3 Bucket for App Assets
 # ---------------------------------------------
-data "aws_s3_bucket" "artifacts" {
+resource "aws_s3_bucket" "artifacts" {
   bucket = "${var.project_name}-artifacts-${var.environment}"
+  tags   = local.tags
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes = [
+      bucket,
+      tags,
+    ]
+  }
 }
 
 resource "aws_s3_bucket_cors_configuration" "artifacts" {
-  bucket = data.aws_s3_bucket.artifacts.id
+    bucket = aws_s3_bucket.artifacts.id
 
   cors_rule {
     allowed_headers = ["*"]
