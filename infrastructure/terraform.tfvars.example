@@ -1,5 +1,11 @@
-aws_region = "us-east-1"
+region = "us-east-1"
 project_name = "rukmer-commons"
 environment = "prod"
-client_domain      = ""
-allowed_origins    = ["http://localhost:4000", ""]
+client_domain = ""
+allowed_origins = ["http://localhost:4000", ""]
+instance_name = "rukmer-commons-ec2-instance"
+allowed_ssh_cidr = "0.0.0.0/0"
+key_pair_name = "rukmer-commons-ec2-key"
+
+# SSH Key Configuration (auto-generated)
+auto_generate_ssh_key = true

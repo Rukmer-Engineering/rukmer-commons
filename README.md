@@ -10,6 +10,11 @@ Copy the **terraform.tfvars.example** and rename it to **terraform.tfvars** and 
 aws s3 ls
 ```
 
+### sync the state of the existing bucket in Prod with local terraform state
+```bash
+ cd ./infrastructure && terraform import aws_s3_bucket.artifacts rukmer-commons-artifacts-prod
+ ```
+
 ### use this command to initialize 
 ```bash
 terraform -chdir=infrastructure init
