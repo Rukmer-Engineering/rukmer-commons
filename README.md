@@ -33,5 +33,8 @@ terraform -chdir=infrastructure apply
 ### use this command after terraform apply
 ```bash
 terraform -chdir=infrastructure output -raw ssh_private_key > ~/.ssh/rukmer-commons-ec2-key
+
 chmod 600 ~/.ssh/rukmer-commons-ec2-key
+
+ssh -i ~/.ssh/rukmer-commons-ec2-key ec2-user@$(terraform -chdir=infrastructure output -raw ec2_public_ip)
 ```
