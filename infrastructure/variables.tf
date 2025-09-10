@@ -46,14 +46,9 @@ variable "instance_name" {
   default     = "my-t2-micro"
 }
 
-variable "key_pair_name" {
-  description = "Name of the AWS key pair for SSH access"
-  type        = string
-  default     = ""
-}
-
-variable "auto_generate_ssh_key" {
-  description = "Whether to auto-generate SSH key pair with Terraform"
-  type        = bool
-  default     = true
+variable "iam_ssh_users" {
+  description = "List of existing IAM usernames for SSH via Session Manager"
+  type        = list(string)
+  default     = []
+  # Example: ["john.doe", "jane.smith"]
 }

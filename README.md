@@ -32,9 +32,9 @@ terraform -chdir=infrastructure apply
 
 ### use this command after terraform apply
 ```bash
-terraform -chdir=infrastructure output -raw ssh_private_key > ~/.ssh/rukmer-commons-ec2-key
+# Setup SSH via Session Manager (one-time per user)
+terraform -chdir=infrastructure output ssh_via_session_manager_setup
 
-chmod 600 ~/.ssh/rukmer-commons-ec2-key
-
-ssh -i ~/.ssh/rukmer-commons-ec2-key ec2-user@$(terraform -chdir=infrastructure output -raw ec2_public_ip)
+# Connect using SSH through Session Manager
+ssh -i ~/.ssh/session-manager-key ec2-user@$(terraform -chdir=infrastructure output -raw instance_id)
 ```

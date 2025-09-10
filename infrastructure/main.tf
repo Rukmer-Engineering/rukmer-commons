@@ -121,19 +121,22 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# Security Group
+# Security Group (conditional SSH access)
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.instance_name}-sg"
   description = "Security group for EC2 instance"
   vpc_id      = aws_vpc.main.id
 
-  # SSH access
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
+  # Conditional SSH access for backward compatibility
+  dynamic "ingress" {
+    for_each = var.enable_backward_compatibility ? [1] : []
+    content {
+      description = "SSH (backward compatibility)"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]  # Restrict this in production
+    }
   }
 
   # HTTP access
@@ -167,56 +170,63 @@ resource "aws_security_group" "ec2_sg" {
   }
 }
 
-# ---------------------------------------------
-# SSH Key Pair (auto-generated)
-# ---------------------------------------------
-
-# Generate private key
-resource "tls_private_key" "main" {
-  count     = var.auto_generate_ssh_key ? 1 : 0
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-# Create AWS key pair with generated public key
-resource "aws_key_pair" "main" {
-  count      = var.auto_generate_ssh_key ? 1 : 0
-  key_name   = var.key_pair_name
-  public_key = tls_private_key.main[0].public_key_openssh
-  
-  tags = {
-    Name = var.key_pair_name
-  }
-}
-
-# ---------------------------------------------
-# EC2 Instance
-# ---------------------------------------------
-
+# Updated EC2 Instance (supports both SSH methods)
 resource "aws_instance" "main" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t2.micro"
-  key_name               = var.key_pair_name != "" ? var.key_pair_name : null
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   subnet_id              = aws_subnet.public.id
+  iam_instance_profile   = aws_iam_instance_profile.ec2_session_manager_profile.name
+  
+  # Backward compatibility: use existing key if specified
+  key_name = var.enable_backward_compatibility && var.existing_ssh_key_name != "" ? var.existing_ssh_key_name : null
 
-  # User data script (optional)
+  # Enhanced user data for both access methods
   user_data = <<-EOF
               #!/bin/bash
               yum update -y
-              yum install -y httpd
-              systemctl start httpd
-              systemctl enable httpd
+              yum install -y httpd amazon-ssm-agent
+              systemctl start httpd amazon-ssm-agent
+              systemctl enable httpd amazon-ssm-agent
               echo "<h1>Hello from ${var.instance_name}</h1>" > /var/www/html/index.html
+              
+              # Log setup completion
+              echo "Instance setup completed at $(date)" >> /var/log/setup.log
+              echo "SSH-via-Session-Manager enabled" >> /var/log/setup.log
+              ${var.enable_backward_compatibility ? "echo 'Backward compatibility mode enabled' >> /var/log/setup.log" : ""}
               EOF
 
   tags = {
     Name = var.instance_name
+    AccessMethod = var.enable_backward_compatibility ? "SSH + Session Manager" : "Session Manager Only"
   }
 }
 
+resource "aws_iam_role" "ec2_session_manager_role" {
+  name = "${var.project_name}-ec2-session-manager-role"
+  
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_session_manager_policy" {
+  role       = aws_iam_role.ec2_session_manager_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2_session_manager_profile" {
+  name = "${var.project_name}-ec2-session-manager-profile"
+  role = aws_iam_role.ec2_session_manager_role.name
+}
+
 # ---------------------------------------------
-# Cognito User Pool for Authentication
+# Cognito User Pool for Marketplace API Authentication
 # ---------------------------------------------
 resource "aws_cognito_user_pool" "main" {
   name = "${var.project_name}-user-pool-${var.environment}"
@@ -290,4 +300,61 @@ resource "aws_cognito_user_group" "publisher" {
   description  = "Publisher group with access to publishing features"
   user_pool_id = aws_cognito_user_pool.main.id
   precedence   = 2
+}
+
+# ---------------------------------------------
+# IAM policy for SSH through Session Manager
+# ---------------------------------------------
+resource "aws_iam_policy" "ssh_session_manager_policy" {
+  count = length(var.iam_ssh_users) > 0 ? 1 : 0
+  name  = "${var.project_name}-ssh-session-manager-policy"
+  
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = "ssm:StartSession"
+        Resource = [
+          "arn:aws:ec2:${var.region}:*:instance/${aws_instance.main.id}",
+          "arn:aws:ssm:*:*:document/AWS-StartSSHSession"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = "ssmmessages:OpenDataChannel"
+        Resource = "arn:aws:ssm:*:*:session/$${aws:userid}-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeInstanceInformation",
+          "ec2:DescribeInstances"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# IAM group for SSH via Session Manager users
+resource "aws_iam_group" "ssh_session_users" {
+  count = length(var.iam_ssh_users) > 0 ? 1 : 0
+  name  = "${var.project_name}-ssh-session-users"
+}
+
+# Attach policy to group
+resource "aws_iam_group_policy_attachment" "ssh_session_policy" {
+  count      = length(var.iam_ssh_users) > 0 ? 1 : 0
+  group      = aws_iam_group.ssh_session_users[0].name
+  policy_arn = aws_iam_policy.ssh_session_manager_policy[0].arn
+}
+
+# Add IAM users to group
+resource "aws_iam_group_membership" "ssh_session_membership" {
+  count = length(var.iam_ssh_users) > 0 ? 1 : 0
+  name  = "${var.project_name}-ssh-session-membership"
+  
+  users = var.iam_ssh_users
+  group = aws_iam_group.ssh_session_users[0].name
 }
