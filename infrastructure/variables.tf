@@ -29,7 +29,7 @@ variable "allowed_origins" {
 
 variable "create_bucket" {
   description = "Name of the existing S3 bucket to use for artifacts"
-  type        = boolean
+  type        = bool
   default     = false
 }
 
