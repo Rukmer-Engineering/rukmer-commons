@@ -8,24 +8,35 @@ output "ec2_public_dns" {
   value       = aws_instance.main.public_dns
 }
 
-output "ssh_key_pair_name" {
-  description = "Name of the SSH key pair used for the EC2 instance"
-  value       = var.key_pair_name
+output "instance_id" {
+  description = "EC2 instance ID for Session Manager"
+  value       = aws_instance.main.id
 }
 
-output "ssh_connection_command" {
-  description = "SSH command to connect to the EC2 instance"
-  value       = var.key_pair_name != "" ? "ssh -i ~/.ssh/${var.key_pair_name} ec2-user@${aws_instance.main.public_ip}" : "No SSH key configured"
+output "connect_to_instance" {
+  description = "How to connect to your EC2 instance"
+  value = <<-EOT
+    Connect to EC2 Instance via Session Manager:
+
+    1. Install Session Manager plugin (one-time):
+       brew install --cask session-manager-plugin
+
+    2. Connect to your instance:
+       aws ssm start-session --target ${aws_instance.main.id}
+
+    ✅ Uses your existing AWS IAM credentials
+    ✅ No SSH ports open to internet
+    ✅ Individual authentication & audit trails
+    ✅ Works immediately - no key setup required
+  EOT
 }
 
-# Output the generated private key
-output "ssh_private_key" {
-  description = "Generated SSH private key (save this to ~/.ssh/)"
-  value       = var.auto_generate_ssh_key ? tls_private_key.main[0].private_key_pem : null
-  sensitive   = true
+output "authorized_users" {
+  description = "IAM users authorized for SSH access"
+  value = length(var.iam_ssh_users) > 0 ? var.iam_ssh_users : ["No users configured - add to iam_ssh_users variable"]
 }
 
-output "ssh_private_key_instructions" {
-  description = "Instructions to save the private key"
-  value = var.auto_generate_ssh_key ? "Run: terraform output -raw ssh_private_key > ~/.ssh/${var.key_pair_name} && chmod 600 ~/.ssh/${var.key_pair_name}" : "No auto-generated key"
+output "connection_command" {
+  description = "Ready-to-use command to connect to your instance"
+  value = "aws ssm start-session --target ${aws_instance.main.id}"
 }
