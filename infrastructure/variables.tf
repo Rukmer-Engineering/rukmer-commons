@@ -27,6 +27,12 @@ variable "allowed_origins" {
   default     = []
 }
 
+variable "create_bucket" {
+  description = "Create the S3 bucket"
+  type        = bool
+  default     = false
+}
+
 # ---------------------------------------------
 # EC2 Instance
 # ---------------------------------------------

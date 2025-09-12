@@ -7,12 +7,16 @@ locals {
     Project     = var.project_name
     Environment = var.environment
   }
+  
+  # Reference to the S3 bucket (either created or existing)
+  artifacts_bucket_id = var.create_bucket ? aws_s3_bucket.artifacts[0].id : data.aws_s3_bucket.artifacts[0].id
 }
 
 # ---------------------------------------------
 # S3 Bucket for App Assets
 # ---------------------------------------------
 resource "aws_s3_bucket" "artifacts" {
+  count  = var.create_bucket ? 1 : 0
   bucket = "${var.project_name}-artifacts-${var.environment}"
   tags   = local.tags
 
@@ -25,8 +29,14 @@ resource "aws_s3_bucket" "artifacts" {
   }
 }
 
+data "aws_s3_bucket" "artifacts" {
+  count  = var.create_bucket ? 0 : 1
+  bucket = "${var.project_name}-artifacts-${var.environment}"
+}
+
+
 resource "aws_s3_bucket_cors_configuration" "artifacts" {
-    bucket = aws_s3_bucket.artifacts.id
+  bucket = local.artifacts_bucket_id
 
   cors_rule {
     allowed_headers = ["*"]
@@ -38,7 +48,7 @@ resource "aws_s3_bucket_cors_configuration" "artifacts" {
 }
 
 #resource "aws_s3_bucket_policy" "artifacts" {
-#  bucket = aws_s3_bucket.artifacts.id
+#  bucket = local.artifacts_bucket_id
 #  policy = jsonencode({
 #    Version = "2012-10-17",
 #    Statement = []
@@ -194,6 +204,7 @@ resource "aws_instance" "main" {
               ${var.enable_backward_compatibility ? "echo 'Backward compatibility mode enabled' >> /var/log/setup.log" : ""}
               EOF
 
+
   tags = {
     Name = var.instance_name
     AccessMethod = var.enable_backward_compatibility ? "SSH + Session Manager" : "Session Manager Only"
@@ -217,6 +228,8 @@ resource "aws_iam_role_policy_attachment" "ec2_session_manager_policy" {
   role       = aws_iam_role.ec2_session_manager_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
+
+
 
 resource "aws_iam_instance_profile" "ec2_session_manager_profile" {
   name = "${var.project_name}-ec2-session-manager-profile"

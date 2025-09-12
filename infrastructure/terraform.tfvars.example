@@ -3,13 +3,15 @@ project_name = "rukmer-commons"
 environment = "prod"
 client_domain = ""
 allowed_origins = ["http://localhost:4000", ""]
+create_bucket = false
 
 instance_name = "you_instance_name"
 iam_ssh_users = [
   # Add your existing IAM usernames here:
   # Everytime a developer deploys, they need to
-  # keep this list updated. Each subsequent deployment
-  # will determine who can SSH into the rukmer-commons-ec2-instance.
+  # keep this list updated. Each deployment
+  # can determine a list of users who collectively
+  # can SSH into the rukmer-commons-ec2-instance
 
   # "your-iam-username",
   # "coworker-iam-username"
