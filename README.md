@@ -30,6 +30,11 @@ terraform -chdir=infrastructure plan
 terraform -chdir=infrastructure apply
 ```
 
+### use this command to output changes to aws
+```bash
+terraform -chdir=infrastructure output
+``
+
 ### use this command after terraform apply
 ```bash
 # Setup SSH via Session Manager (one-time per user)

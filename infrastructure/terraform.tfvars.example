@@ -14,11 +14,22 @@ instance_name = "you_instance_name"
 # enable_backward_compatibility = true
 
 # MODERN: Session Manager SSH (recommended approach)
+# Just list your existing IAM usernames - Terraform handles the rest!
 iam_ssh_users = [
-  # Add your existing IAM usernames here:
-  # Each deployment can determine a list of users who collectively
-  # can SSH into the EC2 instance via AWS Session Manager
-
-  # "your-iam-username",
-  # "coworker-iam-username"
+  # Example usernames (replace with your actual IAM users):
+  # "john.doe",
+  # "jane.smith", 
+  # "developer1"
+  
+  # How to find your IAM username:
+  # Run: aws sts get-caller-identity --query "UserId" --output text
+  # Or check in AWS Console > IAM > Users
 ]
+
+# ---------------------------------------------
+# OPTION: Use Existing IAM Resources (if you get IAM permission errors)
+# ---------------------------------------------
+
+
+existing_ec2_role_name = "ask_for_ec2_role_that_lets_ec2_connect_with_session_manager"
+existing_user_group_name = "ask_for_the_group_name_that_allows_iam_users_to_connect_to_ec2"

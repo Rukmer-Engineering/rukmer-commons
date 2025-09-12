@@ -191,7 +191,7 @@ resource "aws_instance" "main" {
   instance_type          = "t2.micro"
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   subnet_id              = aws_subnet.public.id
-  iam_instance_profile   = aws_iam_instance_profile.ec2_session_manager_profile.name # [MODERN] Session Manager access
+  iam_instance_profile   = local.instance_profile_name # [MODERN] Session Manager access (optional)
   
   # Enhanced user data for both access methods
   user_data = <<-EOF
@@ -218,8 +218,17 @@ resource "aws_instance" "main" {
 # IAM Roles for EC2 - MODERN (Session Manager)
 # REQUIRED: These enable the EC2 instance to communicate with Session Manager
 # ---------------------------------------------
+
+# Data source for existing IAM role (if using existing resources)
+data "aws_iam_role" "existing_ec2_role" {
+  count = var.use_existing_iam_resources ? 1 : 0
+  name  = var.existing_ec2_role_name
+}
+
+# Create new IAM role (if not using existing resources)
 resource "aws_iam_role" "ec2_session_manager_role" {
-  name = "${var.project_name}-ec2-session-manager-role"
+  count = var.use_existing_iam_resources ? 0 : 1
+  name  = "${var.project_name}-ec2-session-manager-role"
   
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -232,15 +241,94 @@ resource "aws_iam_role" "ec2_session_manager_role" {
 }
 
 resource "aws_iam_role_policy_attachment" "ec2_session_manager_policy" {
-  role       = aws_iam_role.ec2_session_manager_role.name
+  count      = var.use_existing_iam_resources ? 0 : 1
+  role       = aws_iam_role.ec2_session_manager_role[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "ec2_session_manager_profile" {
-  name = "${var.project_name}-ec2-session-manager-profile"
-  role = aws_iam_role.ec2_session_manager_role.name
+  count = var.use_existing_iam_resources ? 0 : 1
+  name  = "${var.project_name}-ec2-session-manager-profile"
+  role  = aws_iam_role.ec2_session_manager_role[0].name
 }
 
+# Local value to reference the correct role (existing or created)
+locals {
+  # Only set instance profile if we have IAM resources (either existing or created)
+  has_iam_resources = var.use_existing_iam_resources || length(var.iam_ssh_users) > 0
+  ec2_role_name = var.use_existing_iam_resources ? data.aws_iam_role.existing_ec2_role[0].name : (length(var.iam_ssh_users) > 0 ? aws_iam_role.ec2_session_manager_role[0].name : null)
+  instance_profile_name = var.use_existing_iam_resources ? var.existing_ec2_role_name : (length(var.iam_ssh_users) > 0 ? aws_iam_instance_profile.ec2_session_manager_profile[0].name : null)
+}
+
+
+# ---------------------------------------------
+# IAM User Access - MODERN (Session Manager SSH for Users)
+# RECOMMENDED: This grants your existing IAM users permission to SSH via Session Manager
+# 
+# How it works:
+# 1. Add your existing IAM usernames to var.iam_ssh_users in terraform.tfvars
+# 2. Terraform creates a policy that allows Session Manager access to THIS specific EC2 instance
+# 3. Terraform creates a group and adds your users to it
+# 4. Your users can now SSH using: aws ssm start-session --target INSTANCE_ID
+# ---------------------------------------------
+
+# Create the Session Manager access policy (only if not using existing resources)
+resource "aws_iam_policy" "ssh_session_manager_policy" {
+  count       = var.use_existing_iam_resources ? 0 : 1
+  name        = "${var.project_name}-ssh-session-manager-policy"
+  description = "Policy allowing SSH access to ${var.project_name} EC2 instance via Session Manager"
+  
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowSessionManagerSSH"
+        Effect = "Allow"
+        Action = "ssm:StartSession"
+        Resource = [
+          "arn:aws:ec2:${var.region}:*:instance/${aws_instance.main.id}",
+          "arn:aws:ssm:*:*:document/AWS-StartSSHSession"
+        ]
+      },
+      {
+        Sid      = "AllowSessionManagerMessaging"
+        Effect   = "Allow"
+        Action   = "ssmmessages:OpenDataChannel"
+        Resource = "arn:aws:ssm:*:*:session/$${aws:userid}-*"
+      },
+      {
+        Sid    = "AllowInstanceDiscovery"
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeInstanceInformation",
+          "ec2:DescribeInstances"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = local.tags
+}
+
+# Data sources for existing IAM resources (if using existing resources)
+data "aws_iam_group" "existing_user_group" {
+  count      = var.use_existing_iam_resources && length(var.iam_ssh_users) > 0 ? 1 : 0
+  group_name = var.existing_user_group_name
+}
+
+# Create IAM group for users who need SSH access (only if not using existing resources)
+resource "aws_iam_group" "ssh_session_users" {
+  count = var.use_existing_iam_resources ? 0 : (length(var.iam_ssh_users) > 0 ? 1 : 0)
+  name  = "${var.project_name}-ssh-session-users"
+}
+
+# Attach the policy to the group (only if not using existing resources)
+resource "aws_iam_group_policy_attachment" "ssh_session_policy" {
+  count      = var.use_existing_iam_resources ? 0 : (length(var.iam_ssh_users) > 0 ? 1 : 0)
+  group      = aws_iam_group.ssh_session_users[0].name
+  policy_arn = aws_iam_policy.ssh_session_manager_policy[0].arn
+}
 # ---------------------------------------------
 # Cognito User Pool for Marketplace API Authentication
 # ---------------------------------------------
@@ -316,62 +404,4 @@ resource "aws_cognito_user_group" "publisher" {
   description  = "Publisher group with access to publishing features"
   user_pool_id = aws_cognito_user_pool.main.id
   precedence   = 2
-}
-
-# ---------------------------------------------
-# IAM User Access - MODERN (Session Manager SSH for Users)
-# RECOMMENDED: This grants your existing IAM users permission to SSH via Session Manager
-# ---------------------------------------------
-resource "aws_iam_policy" "ssh_session_manager_policy" {
-  count = length(var.iam_ssh_users) > 0 ? 1 : 0
-  name  = "${var.project_name}-ssh-session-manager-policy"
-  
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = "ssm:StartSession"
-        Resource = [
-          "arn:aws:ec2:${var.region}:*:instance/${aws_instance.main.id}",
-          "arn:aws:ssm:*:*:document/AWS-StartSSHSession"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = "ssmmessages:OpenDataChannel"
-        Resource = "arn:aws:ssm:*:*:session/$${aws:userid}-*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "ssm:DescribeInstanceInformation",
-          "ec2:DescribeInstances"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-# IAM group for SSH via Session Manager users
-resource "aws_iam_group" "ssh_session_users" {
-  count = length(var.iam_ssh_users) > 0 ? 1 : 0
-  name  = "${var.project_name}-ssh-session-users"
-}
-
-# Attach policy to group
-resource "aws_iam_group_policy_attachment" "ssh_session_policy" {
-  count      = length(var.iam_ssh_users) > 0 ? 1 : 0
-  group      = aws_iam_group.ssh_session_users[0].name
-  policy_arn = aws_iam_policy.ssh_session_manager_policy[0].arn
-}
-
-# Add IAM users to group
-resource "aws_iam_group_membership" "ssh_session_membership" {
-  count = length(var.iam_ssh_users) > 0 ? 1 : 0
-  name  = "${var.project_name}-ssh-session-membership"
-  
-  users = var.iam_ssh_users
-  group = aws_iam_group.ssh_session_users[0].name
 }

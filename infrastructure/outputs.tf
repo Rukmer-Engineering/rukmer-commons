@@ -13,32 +13,30 @@ output "instance_id" {
   value       = aws_instance.main.id
 }
 
-output "ssh_via_session_manager_setup" {
-  description = "Simple setup instructions for SSH via Session Manager"
+output "connect_to_instance" {
+  description = "How to connect to your EC2 instance"
   value = <<-EOT
-    SSH via Session Manager Setup (one-time per user):
+    Connect to EC2 Instance via Session Manager:
 
-    1. Install Session Manager plugin:
+    1. Install Session Manager plugin (one-time):
        brew install --cask session-manager-plugin
 
-    2. Add to ~/.ssh/config:
-       Host i-* mi-*
-           ProxyCommand sh -c "aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters 'portNumber=%p'"
-           User ec2-user
-
-    3. Generate SSH key:
-       ssh-keygen -t rsa -b 4096 -f ~/.ssh/session-manager-key
-
-    4. Connect:
-       ssh -i ~/.ssh/session-manager-key ec2-user@${aws_instance.main.id}
+    2. Connect to your instance:
+       aws ssm start-session --target ${aws_instance.main.id}
 
     ✅ Uses your existing AWS IAM credentials
     ✅ No SSH ports open to internet
     ✅ Individual authentication & audit trails
+    ✅ Works immediately - no key setup required
   EOT
 }
 
 output "authorized_users" {
   description = "IAM users authorized for SSH access"
   value = length(var.iam_ssh_users) > 0 ? var.iam_ssh_users : ["No users configured - add to iam_ssh_users variable"]
+}
+
+output "connection_command" {
+  description = "Ready-to-use command to connect to your instance"
+  value = "aws ssm start-session --target ${aws_instance.main.id}"
 }

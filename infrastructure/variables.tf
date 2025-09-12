@@ -66,8 +66,45 @@ variable "allowed_ssh_cidr" {
 # ---------------------------------------------
 
 variable "iam_ssh_users" {
-  description = "[MODERN] List of existing IAM usernames for SSH via Session Manager"
+  description = <<-EOT
+    [MODERN] List of existing IAM usernames for SSH via Session Manager.
+    
+    How to use:
+    1. Create IAM users in AWS Console (or use existing ones)
+    2. Add their usernames to this list
+    3. Terraform will grant them Session Manager SSH access to your EC2 instance
+    4. Users can SSH using: aws ssm start-session --target INSTANCE_ID
+    
+    Example: ["john.doe", "jane.smith", "developer1"]
+  EOT
   type        = list(string)
   default     = []
-  # Example: ["john.doe", "jane.smith"]
+}
+
+# ---------------------------------------------
+# OPTION: Use Existing IAM Resources (if you don't have IAM create permissions)
+# ---------------------------------------------
+
+variable "use_existing_iam_resources" {
+  description = "Use existing IAM roles/policies instead of creating new ones (useful when you don't have IAM create permissions)"
+  type        = bool
+  default     = true
+}
+
+variable "existing_ec2_role_name" {
+  description = "Name of existing IAM role for EC2 Session Manager (only used if use_existing_iam_resources = true)"
+  type        = string
+  default     = ""
+}
+
+variable "existing_user_policy_arn" {
+  description = "ARN of existing IAM policy for user Session Manager access (only used if use_existing_iam_resources = true)"
+  type        = string
+  default     = ""
+}
+
+variable "existing_user_group_name" {
+  description = "Name of existing IAM group for SSH users (only used if use_existing_iam_resources = true)"
+  type        = string
+  default     = ""
 }
