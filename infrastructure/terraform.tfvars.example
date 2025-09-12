@@ -6,12 +6,18 @@ allowed_origins = ["http://localhost:4000", ""]
 create_bucket = false
 
 instance_name = "you_instance_name"
+# ---------------------------------------------
+# SSH Access Configuration
+# ---------------------------------------------
+
+# LEGACY: Traditional SSH (set to false to disable backward compatibility)
+# enable_backward_compatibility = true
+
+# MODERN: Session Manager SSH (recommended approach)
 iam_ssh_users = [
   # Add your existing IAM usernames here:
-  # Everytime a developer deploys, they need to
-  # keep this list updated. Each deployment
-  # can determine a list of users who collectively
-  # can SSH into the rukmer-commons-ec2-instance
+  # Each deployment can determine a list of users who collectively
+  # can SSH into the EC2 instance via AWS Session Manager
 
   # "your-iam-username",
   # "coworker-iam-username"

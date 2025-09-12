@@ -34,20 +34,8 @@ variable "create_bucket" {
 }
 
 # ---------------------------------------------
-# EC2 Instance
+# EC2 Instance - General Configuration
 # ---------------------------------------------
-
-variable "enable_backward_compatibility" {
-  description = "Enable backward compatibility"
-  type        = bool
-  default     = true
-}
-
-variable "allowed_ssh_cidr" {
-  description = "CIDR block allowed for SSH access"
-  type        = string
-  default     = "0.0.0.0/0"  # Restrict this in production
-}
 
 variable "instance_name" {
   description = "Name tag for the EC2 instance"
@@ -55,8 +43,30 @@ variable "instance_name" {
   default     = "my-t2-micro"
 }
 
+# ---------------------------------------------
+# SSH Access - LEGACY (Traditional SSH) 
+# TODO: DEPRECATE THESE WHEN READY TO REMOVE BACKWARD COMPATIBILITY
+# ---------------------------------------------
+
+variable "enable_backward_compatibility" {
+  description = "[LEGACY] Enable traditional SSH access on port 22 (backward compatibility)"
+  type        = bool
+  default     = true
+}
+
+variable "allowed_ssh_cidr" {
+  description = "[LEGACY] CIDR block allowed for traditional SSH access"
+  type        = string
+  default     = "0.0.0.0/0"  # Restrict this in production
+}
+
+# ---------------------------------------------
+# SSH Access - MODERN (AWS Session Manager)
+# RECOMMENDED: Use this approach for secure SSH access
+# ---------------------------------------------
+
 variable "iam_ssh_users" {
-  description = "List of existing IAM usernames for SSH via Session Manager"
+  description = "[MODERN] List of existing IAM usernames for SSH via Session Manager"
   type        = list(string)
   default     = []
   # Example: ["john.doe", "jane.smith"]

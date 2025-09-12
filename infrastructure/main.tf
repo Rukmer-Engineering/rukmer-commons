@@ -131,21 +131,24 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-# Security Group (conditional SSH access)
+# Security Group
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.instance_name}-sg"
   description = "Security group for EC2 instance"
   vpc_id      = aws_vpc.main.id
 
-  # Conditional SSH access for backward compatibility
+  # ---------------------------------------------
+  # LEGACY SSH ACCESS (Traditional SSH on port 22)
+  # TODO: REMOVE WHEN DEPRECATING BACKWARD COMPATIBILITY
+  # ---------------------------------------------
   dynamic "ingress" {
     for_each = var.enable_backward_compatibility ? [1] : []
     content {
-      description = "SSH (backward compatibility)"
+      description = "[LEGACY] SSH access for backward compatibility"
       from_port   = 22
       to_port     = 22
       protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]  # Restrict this in production
+      cidr_blocks = ["0.0.0.0/0"]  # ⚠️ Security risk - restrict this in production
     }
   }
 
@@ -180,15 +183,16 @@ resource "aws_security_group" "ec2_sg" {
   }
 }
 
-# Updated EC2 Instance (supports both SSH methods)
+# ---------------------------------------------
+# EC2 Instance - MODERN (Session Manager enabled)
+# ---------------------------------------------
 resource "aws_instance" "main" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t2.micro"
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   subnet_id              = aws_subnet.public.id
-  iam_instance_profile   = aws_iam_instance_profile.ec2_session_manager_profile.name
+  iam_instance_profile   = aws_iam_instance_profile.ec2_session_manager_profile.name # [MODERN] Session Manager access
   
-
   # Enhanced user data for both access methods
   user_data = <<-EOF
               #!/bin/bash
@@ -200,17 +204,20 @@ resource "aws_instance" "main" {
               
               # Log setup completion
               echo "Instance setup completed at $(date)" >> /var/log/setup.log
-              echo "SSH-via-Session-Manager enabled" >> /var/log/setup.log
-              ${var.enable_backward_compatibility ? "echo 'Backward compatibility mode enabled' >> /var/log/setup.log" : ""}
+              echo "[MODERN] SSH-via-Session-Manager enabled" >> /var/log/setup.log
+              ${var.enable_backward_compatibility ? "echo '[LEGACY] Backward compatibility mode enabled' >> /var/log/setup.log" : ""}
               EOF
-
 
   tags = {
     Name = var.instance_name
-    AccessMethod = var.enable_backward_compatibility ? "SSH + Session Manager" : "Session Manager Only"
+    AccessMethod = var.enable_backward_compatibility ? "[LEGACY+MODERN] SSH + Session Manager" : "[MODERN] Session Manager Only"
   }
 }
 
+# ---------------------------------------------
+# IAM Roles for EC2 - MODERN (Session Manager)
+# REQUIRED: These enable the EC2 instance to communicate with Session Manager
+# ---------------------------------------------
 resource "aws_iam_role" "ec2_session_manager_role" {
   name = "${var.project_name}-ec2-session-manager-role"
   
@@ -312,7 +319,8 @@ resource "aws_cognito_user_group" "publisher" {
 }
 
 # ---------------------------------------------
-# IAM policy for SSH through Session Manager
+# IAM User Access - MODERN (Session Manager SSH for Users)
+# RECOMMENDED: This grants your existing IAM users permission to SSH via Session Manager
 # ---------------------------------------------
 resource "aws_iam_policy" "ssh_session_manager_policy" {
   count = length(var.iam_ssh_users) > 0 ? 1 : 0
