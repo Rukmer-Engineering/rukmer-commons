@@ -27,10 +27,9 @@ variable "allowed_origins" {
   default     = []
 }
 
-variable "create_bucket" {
-  description = "Create the S3 bucket"
-  type        = bool
-  default     = false
+variable "existing_bucket_name" {
+  description = "Name of the existing S3 bucket to use for artifacts"
+  type        = string
 }
 
 # ---------------------------------------------
@@ -41,23 +40,6 @@ variable "instance_name" {
   description = "Name tag for the EC2 instance"
   type        = string
   default     = "my-t2-micro"
-}
-
-# ---------------------------------------------
-# SSH Access - LEGACY (Traditional SSH) 
-# TODO: DEPRECATE THESE WHEN READY TO REMOVE BACKWARD COMPATIBILITY
-# ---------------------------------------------
-
-variable "enable_backward_compatibility" {
-  description = "[LEGACY] Enable traditional SSH access on port 22 (backward compatibility)"
-  type        = bool
-  default     = true
-}
-
-variable "allowed_ssh_cidr" {
-  description = "[LEGACY] CIDR block allowed for traditional SSH access"
-  type        = string
-  default     = "0.0.0.0/0"  # Restrict this in production
 }
 
 # ---------------------------------------------
@@ -82,29 +64,17 @@ variable "iam_ssh_users" {
 }
 
 # ---------------------------------------------
-# OPTION: Use Existing IAM Resources (if you don't have IAM create permissions)
+# Use Existing IAM Resources (if you don't have IAM create permissions)
 # ---------------------------------------------
 
-variable "use_existing_iam_resources" {
-  description = "Use existing IAM roles/policies instead of creating new ones (useful when you don't have IAM create permissions)"
-  type        = bool
-  default     = true
-}
-
 variable "existing_ec2_role_name" {
-  description = "Name of existing IAM role for EC2 Session Manager (only used if use_existing_iam_resources = true)"
-  type        = string
-  default     = ""
-}
-
-variable "existing_user_policy_arn" {
-  description = "ARN of existing IAM policy for user Session Manager access (only used if use_existing_iam_resources = true)"
+  description = "Name of existing IAM role for EC2 Session Manager"
   type        = string
   default     = ""
 }
 
 variable "existing_user_group_name" {
-  description = "Name of existing IAM group for SSH users (only used if use_existing_iam_resources = true)"
+  description = "Name of existing IAM group for SSH users"
   type        = string
   default     = ""
 }

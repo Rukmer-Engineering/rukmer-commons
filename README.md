@@ -33,13 +33,21 @@ terraform -chdir=infrastructure apply
 ### use this command to output changes to aws
 ```bash
 terraform -chdir=infrastructure output
-``
-
-### use this command after terraform apply
-```bash
-# Setup SSH via Session Manager (one-time per user)
-terraform -chdir=infrastructure output ssh_via_session_manager_setup
-
-# Connect using SSH through Session Manager
-ssh -i ~/.ssh/session-manager-key ec2-user@$(terraform -chdir=infrastructure output -raw instance_id)
 ```
+
+### use this command to import an existing instance in AWS ECS
+### find the instance id in the aws console
+```bash
+terraform import aws_instance.main {i-00000abcdef11111}
+```
+
+### use this command to ssh into the EC2 via Session Manager
+```bash
+aws ssm start-session --target {i-00000abcdef11111}
+```
+
+### Install the AWS session manager 
+```bash
+ brew install --cask session-manager-plugin
+```
+

@@ -6,14 +6,9 @@ allowed_origins = ["http://localhost:4000", ""]
 create_bucket = false
 
 instance_name = "you_instance_name"
-# ---------------------------------------------
-# SSH Access Configuration
-# ---------------------------------------------
+existing_bucket_name = "your_existing_bucket_name"
 
-# LEGACY: Traditional SSH (set to false to disable backward compatibility)
-# enable_backward_compatibility = true
-
-# MODERN: Session Manager SSH (recommended approach)
+# Session Manager SSH (recommended approach)
 # Just list your existing IAM usernames - Terraform handles the rest!
 iam_ssh_users = [
   # Example usernames (replace with your actual IAM users):
