@@ -16,7 +16,6 @@ variable "environment" {
   default     = "prod"
 }
 
-
 variable "client_domain" {
   description = "Allowed client domain for CORS"
   type        = string
@@ -28,11 +27,15 @@ variable "allowed_origins" {
   default     = []
 }
 
-
-
 # ---------------------------------------------
 # EC2 Instance
 # ---------------------------------------------
+
+variable "enable_backward_compatibility" {
+  description = "Enable backward compatibility"
+  type        = bool
+  default     = true
+}
 
 variable "allowed_ssh_cidr" {
   description = "CIDR block allowed for SSH access"

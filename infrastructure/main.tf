@@ -178,8 +178,6 @@ resource "aws_instance" "main" {
   subnet_id              = aws_subnet.public.id
   iam_instance_profile   = aws_iam_instance_profile.ec2_session_manager_profile.name
   
-  # Backward compatibility: use existing key if specified
-  key_name = var.enable_backward_compatibility && var.existing_ssh_key_name != "" ? var.existing_ssh_key_name : null
 
   # Enhanced user data for both access methods
   user_data = <<-EOF
