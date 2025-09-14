@@ -1,5 +1,8 @@
-infrastructure/terraform.tfvars
+*/**/terraform.tfvars
 
-infrastructure/.terraform*
+*/**/.terraform*
 
-infrastructure/terraform.tfstate*
+*/**/terraform.tfstate*
+
+rukmer-inc-design/*
+
