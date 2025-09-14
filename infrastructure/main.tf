@@ -7,13 +7,6 @@ locals {
     Project     = var.project_name
     Environment = var.environment
   }
-  
-
-# ---------------------------------------------
-# S3 Bucket for App Assets
-# ---------------------------------------------
-# Reference to the S3 bucket (conditional)
-  artifacts_bucket_id = var.create_new_storage ? aws_s3_bucket.artifacts[0].id : var.existing_bucket_name
 }
 
 # Create bucket - Terraform will manage it going forward
@@ -32,7 +25,7 @@ resource "aws_s3_bucket" "artifacts" {
 
 resource "aws_s3_bucket_cors_configuration" "artifacts" {
   count  = var.create_new_storage ? 1 : 0
-  bucket = local.artifacts_bucket_id
+  bucket = var.create_new_storage ? aws_s3_bucket.artifacts[0].id : var.existing_bucket_name
 
   cors_rule {
     allowed_headers = ["*"]
