@@ -167,15 +167,14 @@ resource "aws_instance" "main" {
   iam_instance_profile   = var.existing_ec2_role_name != "" ? local.instance_profile_name : null
   
   # EC2 initialization script
-  # Unfortunately, AWS requires the parameter to be called user_data - there's no way around this. 
-  user_data = base64encode(templatefile("${path.module}/ec2-init.sh", {
+  user_data_base64 = base64encode(templatefile("${path.module}/ec2-init.sh", {
     instance_name = var.instance_name
     ecr_repo_url  = local.ecr_repository_url
     region        = var.region
   }))
 
   lifecycle {
-    ignore_changes = [user_data, ami]
+    ignore_changes = [user_data_base64, ami]
   }
 
    metadata_options {
