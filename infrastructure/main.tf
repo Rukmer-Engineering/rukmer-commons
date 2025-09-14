@@ -25,7 +25,6 @@ resource "aws_s3_bucket" "artifacts" {
   lifecycle {
     prevent_destroy = true  
     ignore_changes = [
-      bucket,
       tags,
     ]
   }
