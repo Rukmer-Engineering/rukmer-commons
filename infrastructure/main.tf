@@ -8,8 +8,8 @@ locals {
     Environment = var.environment
   }
   
-  # Reference to the S3 bucket
-  artifacts_bucket_id = aws_s3_bucket.artifacts.id
+  # Reference to the S3 bucket (conditional)
+  artifacts_bucket_id = var.create_bucket ? aws_s3_bucket.artifacts[0].id : var.existing_bucket_name
 }
 
 # ---------------------------------------------
@@ -18,6 +18,7 @@ locals {
 
 # Create bucket - Terraform will manage it going forward
 resource "aws_s3_bucket" "artifacts" {
+  count  = var.create_bucket ? 1 : 0
   bucket = var.existing_bucket_name
   tags   = local.tags
 
@@ -31,6 +32,7 @@ resource "aws_s3_bucket" "artifacts" {
 }
 
 resource "aws_s3_bucket_cors_configuration" "artifacts" {
+  count  = var.create_bucket ? 1 : 0
   bucket = local.artifacts_bucket_id
 
   cors_rule {
@@ -131,6 +133,40 @@ resource "aws_security_group" "ec2_sg" {
   name        = "${var.instance_name}-sg"
   description = "Security group for EC2 instance"
   vpc_id      = aws_vpc.main.id
+
+  # Ingress rules
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "[LEGACY] SSH access for backward compatibility"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Egress rules - REQUIRED for SSM to work
+  egress {
+    description = "All outbound traffic for SSM and updates"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   tags = {
     Name = "${var.instance_name}-sg"
