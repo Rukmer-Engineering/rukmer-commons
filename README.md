@@ -1,81 +1,175 @@
-# BASIC Instructions for Terraform
+# Rukmer Commons
 
-## What to do?
+A containerized Elixir marketplace platform for drone software distribution, enabling publishers to distribute C++ packages and subscribers to manage drone fleets.
 
-### First thing to do:
-Copy the **terraform.tfvars.example** and rename it to **terraform.tfvars** and configure your local environment variables
+## Architecture Overview
 
-### use this command to view S3 buckets
+- **Elixir + Phoenix**: Web application framework with LiveView
+- **Docker**: Containerized deployment
+- **AWS ECR**: Private container registry
+- **AWS EC2**: Application hosting with Session Manager access
+- **AWS S3**: Artifact storage for drone software packages
+- **AWS Cognito**: User authentication and authorization
+- **Terraform**: Infrastructure as Code
+
+### Prerequisites
+
+1. **AWS CLI configured** with appropriate permissions
+2. **Docker Desktop** installed and running
+3. **Terraform** installed
+4. **Session Manager plugin** for AWS CLI
+
 ```bash
-aws s3 ls
+# Install Session Manager plugin (macOS)
+brew install --cask session-manager-plugin
 ```
 
-### sync the state of the existing bucket in Prod with local terraform state
-```bash
- cd ./infrastructure && terraform import aws_s3_bucket.artifacts rukmer-commons-artifacts-prod
- ```
+### Initial Setup
 
-### use this command to initialize 
+1. **Configure Terraform variables**
+   ```bash
+   cd infrastructure
+   cp terraform.tfvars.example terraform.tfvars
+   # Edit terraform.tfvars with your AWS configuration
+   ```
+
+2. **Initialize and deploy infrastructure**
+   ```bash
+   cd infrastructure
+   terraform init
+   terraform plan
+   terraform apply
+   ```
+
+3. **Get deployment commands**
+   ```bash
+   terraform output docker_commands
+   ```
+
+## Development Workflow
+
+### Local Development
+
 ```bash
+# Navigate to the src directory
+cd src
+
+# Build and test locally
+docker build --no-cache -t rukmer-app .
+docker run -p 4000:4000 rukmer-app
+```
+
+### Deploy to Production
+
+1. **Build and push to ECR**
+    Use the terraform output to get build instructions
+    ```bash
+    cd infrastructure & terraform output docker_commands
+    ```
+
+    The terraform output (once terraform has been applied at least once), should have the following
+    ```bash
+    # Build application (from src directory)
+    docker build --no-cache -t rukmer-app .
+
+    # Tag for ECR (use output from terraform)
+    docker tag rukmer-app:latest {YOUR_ECR_URL}:latest
+
+    # Authenticate with ECR
+    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_ECR_URL
+
+    # Push to registry
+    docker push YOUR_ECR_URL:latest
+    ```
+
+2. **Deploy to EC2**
+   ```bash
+    # Find the EC2 instance running the Elixir app if it has previously been deployed
+    aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name,Tags[?Key==`Name`].Value|[0],IamInstanceProfile.Arn]' --output table
+
+    # Connect to EC2 instance
+    aws ssm start-session --target YOUR_INSTANCE_ID
+
+    # Run deployment script
+    ./deploy.sh
+   ```
+
+## Infrastructure Management
+
+### Terraform Commands
+
+```bash
+# Change directory to infrastructure
+cd infrastructure
+
+# Initialize Terraform
+terraform init
+
+# Preview changes
+terraform plan
+
+# Apply changes
+terraform apply
+
+# View outputs
+terraform destroy
+
+# View outputs
+terraform output
+
+# alternatively you can use the one-liner commands at the root level
 terraform -chdir=infrastructure init
-```
-
-### use this command to see compare the changes made from the existing cloud infrastructure
-```bash
 terraform -chdir=infrastructure plan
-```
-
-### use this command to apply/commit changes to aws
-```bash
 terraform -chdir=infrastructure apply
-```
-
-### use this command to output changes to aws
-```bash
 terraform -chdir=infrastructure output
+terraform -chdir=infrastructure destroy
+...
+
+cd infrastructure & terraform init
+cd infrastructure & terraform plan
+cd infrastructure & terraform apply
+cd infrastructure & terraform output
+cd infrastructure & terraform destroy
+...
 ```
 
-### Install the AWS session manager 
-```bash
- brew install --cask session-manager-plugin
-```
 
-### use this command to list all AWS EC2 instances in the terminal
+### Useful Debugging Commands
+
 ```bash
+# list all remote S3 buckets
+aws s3 ls
+
+# List all remote EC2 instances
 aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name,Tags[?Key==`Name`].Value|[0],IamInstanceProfile.Arn]' --output table
+
+# Log in to remote EC2 instance
+aws ssm start-session --target INSTANCE_ID
+
+# List all docker commands for local image building and remote image management
+cd infrastructure & terraform output docker_commands
+
+# list all ec2 remote session management commands
+cd infrastructure & terraform output connect_to_instance
+
+# Check EC2 instance status
+aws ssm describe-instance-information
+
+# View application logs in EC2
+aws ssm start-session --target INSTANCE_ID
+docker logs app --tail 50
+
+# Check container status in EC2
+docker ps -a
+
+# Test health endpoint in EC2
+curl http://PUBLIC_IP/api/health
 ```
 
-### use the following command to import an existing instance in AWS EC2
-### first, clear the old aws instance state just to be safe
-### then let terraform know which main EC2 instance to save in state
-### find the instance id in the EC2 instance in the AWS Console UI
-### or use the following command to list all existing AWS EC2 instances
-```bash
-terraform state rm aws_instance.main
-terraform import aws_instance.main {i-00000abcdef11111}
-```
-### IMPORTANT: When first creating the EC2 instance, terraform runs a user data script located in main.tf 
+## Next Steps
 
-```bash 
-#!/bin/bash
-yum update -y                              # Update the system
-yum install -y httpd amazon-ssm-agent      # Install web server + SSM agent
-systemctl start httpd amazon-ssm-agent     # Start both services
-systemctl enable httpd amazon-ssm-agent    # Enable them to start on boot
-echo "<h1>Hello from ${var.instance_name}</h1>" > /var/www/html/index.html
-echo "Instance setup completed at $(date)" >> /var/log/setup.log
-echo "SSH-via-Session-Manager enabled" >> /var/log/setup.log
-```
-# What This Script Does:
-* Updates the system (can take 5-15 minutes)
-* Installs the SSM agent (amazon-ssm-agent package)
-* Starts the SSM agent (systemctl start amazon-ssm-agent)
-* Enables it to auto-start on future reboots
-
-Please note that it might take up to 5-15 minutes, before user can ssh into the EC2 via Session Manager, as descibed in the step above
-
-
-### use this command to ssh into the EC2 via Session Manager
-```bash
-aws ssm start-session --target {i-00000abcdef11111}
-```
+1. Implement AWS Cognito authentication
+2. Add S3 artifact upload functionality
+3. Create publisher and subscriber workflows
+4. Implement drone registration system
+5. Add real-time coordination features
