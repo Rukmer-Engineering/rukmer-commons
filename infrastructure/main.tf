@@ -165,28 +165,35 @@ resource "aws_security_group" "ec2_sg" {
 }
 
 # ---------------------------------------------
-# EC2 Instance - MODERN Session Manager enabled
+# EC2 Instance - Session Manager enabled
 # ---------------------------------------------
 resource "aws_instance" "main" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t2.micro"
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   subnet_id              = aws_subnet.public.id
-  iam_instance_profile   = local.instance_profile_name # [MODERN] Session Manager access (optional)
+  iam_instance_profile   = local.instance_profile_name
   
-  # Enhanced user data for both access methods
-  user_data = <<-EOF
-              #!/bin/bash
-              yum update -y
-              yum install -y httpd amazon-ssm-agent
-              systemctl start httpd amazon-ssm-agent
-              systemctl enable httpd amazon-ssm-agent
-              echo "<h1>Hello from ${var.instance_name}</h1>" > /var/www/html/index.html
-              
-              # Log setup completion
-              echo "Instance setup completed at $(date)" >> /var/log/setup.log
-              echo "SSH-via-Session-Manager enabled" >> /var/log/setup.log
-              EOF
+  # Updated to use ec2-init.sh
+  ec2_init_script = base64encode(templatefile("${path.module}/ec2-init.sh", {
+    instance_name = var.instance_name
+    ecr_repo_url  = aws_ecr_repository.rukmer_app.repository_url
+    region        = var.region
+  }))
+
+  lifecycle {
+    ignore_changes = [ec2_init_script, ami]
+  }
+
+   metadata_options {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+    http_put_response_hop_limit = 1
+  }
+
+  root_block_device {
+    encrypted = true
+  }
 
   tags = {
     Name = var.instance_name
