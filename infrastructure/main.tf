@@ -8,13 +8,13 @@ locals {
     Environment = var.environment
   }
   
-  # Reference to the S3 bucket (conditional)
-  artifacts_bucket_id = var.create_bucket ? aws_s3_bucket.artifacts[0].id : var.existing_bucket_name
-}
 
 # ---------------------------------------------
 # S3 Bucket for App Assets
 # ---------------------------------------------
+# Reference to the S3 bucket (conditional)
+  artifacts_bucket_id = var.create_bucket ? aws_s3_bucket.artifacts[0].id : var.existing_bucket_name
+}
 
 # Create bucket - Terraform will manage it going forward
 resource "aws_s3_bucket" "artifacts" {
@@ -23,7 +23,7 @@ resource "aws_s3_bucket" "artifacts" {
   tags   = local.tags
 
   lifecycle {
-    # prevent_destroy = true  # Temporarily disabled for destroy
+    prevent_destroy = true  
     ignore_changes = [
       bucket,
       tags,
@@ -150,15 +150,6 @@ resource "aws_security_group" "ec2_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
-  ingress {
-    description = "[LEGACY] SSH access for backward compatibility"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   # Egress rules - REQUIRED for SSM to work
   egress {
     description = "All outbound traffic for SSM and updates"
