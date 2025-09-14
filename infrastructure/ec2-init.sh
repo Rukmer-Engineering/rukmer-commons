@@ -32,7 +32,7 @@ aws ecr get-login-password --region ${region} | docker login --username AWS --pa
 docker pull ${ecr_repo_url}:latest
 docker stop app 2>/dev/null || true
 docker rm app 2>/dev/null || true  
-hingdocker run -d --name app --restart unless-stopped -p 8080:4000 ${ecr_repo_url}:latest
+docker run -d --name app --restart unless-stopped -p 8080:4000 ${ecr_repo_url}:latest
 echo "✅ Done"
 EOF
 
