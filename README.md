@@ -38,6 +38,7 @@ brew install --cask session-manager-plugin
    cd infrastructure
    terraform init
    terraform plan
+   terraform refresh
    terraform apply
    ```
 
@@ -111,7 +112,8 @@ terraform init
 # Preview changes
 terraform plan
 
-# Apply changes
+# Refresh state and apply changes
+terraform refresh
 terraform apply
 
 # View outputs
@@ -123,6 +125,7 @@ terraform output
 # alternatively you can use the one-liner commands at the root level
 terraform -chdir=infrastructure init
 terraform -chdir=infrastructure plan
+terraform -chdir=infrastructure refresh
 terraform -chdir=infrastructure apply
 terraform -chdir=infrastructure output
 terraform -chdir=infrastructure destroy
@@ -130,6 +133,7 @@ terraform -chdir=infrastructure destroy
 
 cd infrastructure & terraform init
 cd infrastructure & terraform plan
+cd infrastructure & terraform refresh
 cd infrastructure & terraform apply
 cd infrastructure & terraform output
 cd infrastructure & terraform destroy

@@ -16,7 +16,7 @@ resource "aws_s3_bucket" "artifacts" {
   tags   = local.tags
 
   lifecycle {
-    prevent_destroy = true  
+    prevent_destroy = false  
     ignore_changes = [
       tags,
     ]
@@ -236,7 +236,7 @@ resource "aws_ecr_repository" "rukmer_app" {
   }
 
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = false
   }
 
   tags = local.tags
