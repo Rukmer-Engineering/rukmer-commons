@@ -16,7 +16,7 @@ resource "aws_s3_bucket" "artifacts" {
   tags   = local.tags
 
   lifecycle {
-    prevent_destroy = false  
+    prevent_destroy = true  
     ignore_changes = [
       tags,
     ]
@@ -55,7 +55,7 @@ data "aws_ami" "amazon_linux" {
   
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["amzn2-ami-hvm-*-arm64-gp2"]  # ARM64 AMI
   }
   
   filter {
@@ -126,19 +126,18 @@ resource "aws_security_group" "ec2_sg" {
   description = "Security group for EC2 instance"
   vpc_id      = aws_vpc.main.id
 
-  # Ingress rules
   ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
+    description = "Elixir App"
+    from_port   = 8080
+    to_port     = 8080
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -161,7 +160,7 @@ resource "aws_security_group" "ec2_sg" {
 # ---------------------------------------------
 resource "aws_instance" "main" {
   ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t2.micro"
+  instance_type          = "t4g.medium"  # ARM-based Graviton processor
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   subnet_id              = aws_subnet.public.id
   iam_instance_profile   = var.existing_ec2_role_name != "" ? local.instance_profile_name : null
@@ -235,7 +234,7 @@ resource "aws_ecr_repository" "rukmer_app" {
   }
 
   lifecycle {
-    prevent_destroy = false
+    prevent_destroy = true
   }
 
   tags = local.tags

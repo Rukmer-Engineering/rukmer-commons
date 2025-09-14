@@ -70,7 +70,7 @@ docker run -p 4000:4000 rukmer-app
 
     The terraform output (once terraform has been applied at least once), should have the following
     ```bash
-    # Build application (from src directory)
+    # Build application (from src directory) - ARM64 for Graviton EC2
     docker build --no-cache -t rukmer-app .
 
     # Tag for ECR (use output from terraform)

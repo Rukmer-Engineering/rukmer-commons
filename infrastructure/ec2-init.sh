@@ -17,8 +17,8 @@ echo "ec2-user:100000:65536" >> /etc/subgid
 echo "<h1>Hello from ${instance_name}</h1>" > /var/www/html/index.html
 echo "<p>Docker ready for Elixir deployment</p>" >> /var/www/html/index.html
 
-# Install AWS CLI
-curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+# Install AWS CLI for ARM64
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
 unzip -q awscliv2.zip
 ./aws/install
 rm -rf awscliv2.zip aws/
@@ -32,7 +32,7 @@ aws ecr get-login-password --region ${region} | docker login --username AWS --pa
 docker pull ${ecr_repo_url}:latest
 docker stop app 2>/dev/null || true
 docker rm app 2>/dev/null || true  
-docker run -d --name app --restart unless-stopped -p 80:4000 ${ecr_repo_url}:latest
+hingdocker run -d --name app --restart unless-stopped -p 8080:4000 ${ecr_repo_url}:latest
 echo "✅ Done"
 EOF
 

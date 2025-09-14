@@ -53,7 +53,7 @@ BUILD AND DEPLOY ELIXIR APPLICATION
    ./deploy.sh
 
 ────────────────────────────────────────
-App will be available at: http://[EC2_PUBLIC_IP]/
+App will be available at: http://[EC2_PUBLIC_IP]:8080/
 ────────────────────────────────────────
 EOF
 }
