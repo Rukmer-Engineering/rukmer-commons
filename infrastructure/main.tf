@@ -174,15 +174,16 @@ resource "aws_instance" "main" {
   subnet_id              = aws_subnet.public.id
   iam_instance_profile   = local.instance_profile_name
   
-  # Updated to use ec2-init.sh
-  ec2_init_script = base64encode(templatefile("${path.module}/ec2-init.sh", {
+  # EC2 initialization script
+  # Unfortunately, AWS requires the parameter to be called user_data - there's no way around this. 
+  user_data = base64encode(templatefile("${path.module}/ec2-init.sh", {
     instance_name = var.instance_name
     ecr_repo_url  = aws_ecr_repository.rukmer_app.repository_url
     region        = var.region
   }))
 
   lifecycle {
-    ignore_changes = [ec2_init_script, ami]
+    ignore_changes = [user_data, ami]
   }
 
    metadata_options {
