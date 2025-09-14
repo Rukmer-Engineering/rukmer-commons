@@ -5,19 +5,19 @@ output "instance_id" {
 
 output "connect_to_instance" {
   description = "How to connect to your EC2 instance"
-  value = <<-EOT
-    ========================================
-    Connect to EC2 Instance via Session Manager
-    ========================================
-    
-    Step 1: Install Session Manager plugin (one-time setup)
-    	brew install --cask session-manager-plugin
-    
-    Step 2: Connect to your instance
-    	aws ssm start-session --target ${aws_instance.main.id}
-    
-    ========================================
-  EOT
+  value = <<EOF
+
+CONNECT TO EC2 INSTANCE
+────────────────────────────────────────
+
+1. Install Session Manager plugin (one-time):
+   brew install --cask session-manager-plugin
+
+2. Connect to your instance:
+   aws ssm start-session --target ${aws_instance.main.id}
+
+────────────────────────────────────────
+EOF
 }
 
 output "ecr_repository_url" {
@@ -27,34 +27,33 @@ output "ecr_repository_url" {
 
 output "docker_commands" {
   description = "Commands to deploy your Elixir Docker image"
-  value = <<-EOT
-    ========================================
-    Build and Deploy Your Elixir Application
-    ========================================
-    
-    Step 1: Build a new Docker image
-    	cd ../src
-    	docker build --no-cache -t rukmer-app .
-    
-    Step 2: Tag the image for ECR
-    	docker tag rukmer-app:latest ${local.ecr_repository_url}:latest
-    
-    Step 3: Login to ECR
-    	aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${local.ecr_repository_url}
-    
-    Step 4: Push the image to ECR repository
-    	docker push ${local.ecr_repository_url}:latest
-    
-    Step 5: Deploy to EC2 instance
-    	aws ssm start-session --target ${aws_instance.main.id}
-    
-    Step 6: Run the deployment script on EC2
-    	sudo su - ec2-user
-    	./deploy.sh
-    
-    ========================================
-    🚀 Your application should now be running at:
-    http://[EC2_PUBLIC_IP]/
-    ========================================
-  EOT
+  value = <<EOF
+
+BUILD AND DEPLOY ELIXIR APPLICATION
+────────────────────────────────────────
+
+1. Build Docker image:
+   cd ../src
+   docker build --no-cache -t rukmer-app .
+
+2. Tag for ECR:
+   docker tag rukmer-app:latest ${local.ecr_repository_url}:latest
+
+3. Login to ECR:
+   aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${local.ecr_repository_url}
+
+4. Push to ECR:
+   docker push ${local.ecr_repository_url}:latest
+
+5. Deploy to EC2:
+   aws ssm start-session --target ${aws_instance.main.id}
+
+6. Run deployment script:
+   sudo su - ec2-user
+   ./deploy.sh
+
+────────────────────────────────────────
+App will be available at: http://[EC2_PUBLIC_IP]/
+────────────────────────────────────────
+EOF
 }
