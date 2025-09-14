@@ -7,17 +7,23 @@ locals {
     Project     = var.project_name
     Environment = var.environment
   }
+  
+  # Reference to the S3 bucket (conditional)
+  artifacts_bucket_id = var.create_bucket ? aws_s3_bucket.artifacts[0].id : var.existing_bucket_name
 }
 
 # ---------------------------------------------
 # S3 Bucket for App Assets
 # ---------------------------------------------
+
+# Create bucket - Terraform will manage it going forward
 resource "aws_s3_bucket" "artifacts" {
-  bucket = "${var.project_name}-artifacts-${var.environment}"
+  count  = var.create_bucket ? 1 : 0
+  bucket = var.existing_bucket_name
   tags   = local.tags
 
   lifecycle {
-    prevent_destroy = true
+    # prevent_destroy = true  # Temporarily disabled for destroy
     ignore_changes = [
       bucket,
       tags,
@@ -26,7 +32,8 @@ resource "aws_s3_bucket" "artifacts" {
 }
 
 resource "aws_s3_bucket_cors_configuration" "artifacts" {
-    bucket = aws_s3_bucket.artifacts.id
+  count  = var.create_bucket ? 1 : 0
+  bucket = local.artifacts_bucket_id
 
   cors_rule {
     allowed_headers = ["*"]
@@ -38,7 +45,7 @@ resource "aws_s3_bucket_cors_configuration" "artifacts" {
 }
 
 #resource "aws_s3_bucket_policy" "artifacts" {
-#  bucket = aws_s3_bucket.artifacts.id
+#  bucket = local.artifacts_bucket_id
 #  policy = jsonencode({
 #    Version = "2012-10-17",
 #    Statement = []
@@ -127,16 +134,7 @@ resource "aws_security_group" "ec2_sg" {
   description = "Security group for EC2 instance"
   vpc_id      = aws_vpc.main.id
 
-  # SSH access
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
-  # HTTP access
+  # Ingress rules
   ingress {
     description = "HTTP"
     from_port   = 80
@@ -145,7 +143,6 @@ resource "aws_security_group" "ec2_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTPS access
   ingress {
     description = "HTTPS"
     from_port   = 443
@@ -154,8 +151,17 @@ resource "aws_security_group" "ec2_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # All outbound traffic
+  ingress {
+    description = "[LEGACY] SSH access for backward compatibility"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Egress rules - REQUIRED for SSM to work
   egress {
+    description = "All outbound traffic for SSM and updates"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -168,55 +174,61 @@ resource "aws_security_group" "ec2_sg" {
 }
 
 # ---------------------------------------------
-# SSH Key Pair (auto-generated)
+# EC2 Instance - MODERN Session Manager enabled
 # ---------------------------------------------
-
-# Generate private key
-resource "tls_private_key" "main" {
-  count     = var.auto_generate_ssh_key ? 1 : 0
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-# Create AWS key pair with generated public key
-resource "aws_key_pair" "main" {
-  count      = var.auto_generate_ssh_key ? 1 : 0
-  key_name   = var.key_pair_name
-  public_key = tls_private_key.main[0].public_key_openssh
-  
-  tags = {
-    Name = var.key_pair_name
-  }
-}
-
-# ---------------------------------------------
-# EC2 Instance
-# ---------------------------------------------
-
 resource "aws_instance" "main" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t2.micro"
-  key_name               = var.key_pair_name != "" ? var.key_pair_name : null
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   subnet_id              = aws_subnet.public.id
-
-  # User data script (optional)
+  iam_instance_profile   = local.instance_profile_name # [MODERN] Session Manager access (optional)
+  
+  # Enhanced user data for both access methods
   user_data = <<-EOF
               #!/bin/bash
               yum update -y
-              yum install -y httpd
-              systemctl start httpd
-              systemctl enable httpd
+              yum install -y httpd amazon-ssm-agent
+              systemctl start httpd amazon-ssm-agent
+              systemctl enable httpd amazon-ssm-agent
               echo "<h1>Hello from ${var.instance_name}</h1>" > /var/www/html/index.html
+              
+              # Log setup completion
+              echo "Instance setup completed at $(date)" >> /var/log/setup.log
+              echo "SSH-via-Session-Manager enabled" >> /var/log/setup.log
               EOF
 
   tags = {
     Name = var.instance_name
+    AccessMethod = "Session Manager Only"
   }
 }
 
 # ---------------------------------------------
-# Cognito User Pool for Authentication
+# IAM Roles for EC2 - Session Manager
+# REQUIRED: These enable the EC2 instance to communicate with Session Manager
+# ---------------------------------------------
+
+# Data source for existing IAM role
+data "aws_iam_role" "existing_ec2_role" {
+  name = var.existing_ec2_role_name
+}
+
+# Local value to reference existing IAM resources
+locals {
+  # Always use existing IAM resources
+  has_iam_resources = length(var.iam_ssh_users) > 0
+  ec2_role_name = data.aws_iam_role.existing_ec2_role.name 
+  instance_profile_name = var.existing_ec2_role_name
+}
+
+# Data source for existing IAM group
+data "aws_iam_group" "existing_user_group" {
+  count      = length(var.iam_ssh_users) > 0 ? 1 : 0
+  group_name = var.existing_user_group_name
+}
+
+# ---------------------------------------------
+# Cognito User Pool for Marketplace API Authentication
 # ---------------------------------------------
 resource "aws_cognito_user_pool" "main" {
   name = "${var.project_name}-user-pool-${var.environment}"

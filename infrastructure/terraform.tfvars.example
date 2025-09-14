@@ -3,9 +3,34 @@ project_name = "rukmer-commons"
 environment = "prod"
 client_domain = ""
 allowed_origins = ["http://localhost:4000", ""]
-instance_name = "rukmer-commons-ec2-instance"
-allowed_ssh_cidr = "0.0.0.0/0"
-key_pair_name = "rukmer-commons-ec2-key"
 
-# SSH Key Configuration (auto-generated)
-auto_generate_ssh_key = true
+# EC2 Instance and IAM Resources for Session Manager
+instance_name = "you_instance_name"
+existing_ec2_role_name = "ask_for_ec2_role_that_lets_ec2_connect_with_session_manager"
+existing_user_group_name = "ask_for_the_group_name_that_allows_iam_users_to_connect_to_ec2"
+
+# Just list your existing IAM usernames - Terraform handles the rest!
+iam_ssh_users = [
+  # Example usernames (replace with your actual IAM users):
+  # "john.doe",
+  # "jane.smith", 
+  # "developer1"
+  
+  # How to find your IAM username:
+  # Run: aws sts get-caller-identity --query "UserId" --output text
+  # Or check in AWS Console > IAM > Users
+]
+
+
+existing_user_group_name = "rukmer_engineers"
+iam_ssh_users = [
+  "yu_lin",
+  "john_solon"
+]
+
+# S3 Bucket for App Assets
+create_bucket = false
+existing_bucket_name = "your_existing_bucket_name"
+
+
+
