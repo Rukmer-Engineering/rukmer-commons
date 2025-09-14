@@ -27,15 +27,21 @@ variable "allowed_origins" {
   default     = []
 }
 
-variable "create_bucket" {
-  description = "Name of the existing S3 bucket to use for artifacts"
+variable "create_new_storage" {
+  description = "Whether to create new S3 bucket and ECR repository (false = use existing)"
   type        = bool
   default     = false
 }
 
 variable "existing_bucket_name" {
-  description = "Name of the existing S3 bucket to use for artifacts"
+  description = "Name of existing S3 bucket to use for artifacts"
   type        = string
+}
+
+variable "existing_ecr_repository_name" {
+  description = "Name of existing ECR repository to use"
+  type        = string
+  default     = ""
 }
 
 # ---------------------------------------------

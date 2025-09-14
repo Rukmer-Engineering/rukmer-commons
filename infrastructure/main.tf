@@ -13,12 +13,12 @@ locals {
 # S3 Bucket for App Assets
 # ---------------------------------------------
 # Reference to the S3 bucket (conditional)
-  artifacts_bucket_id = var.create_bucket ? aws_s3_bucket.artifacts[0].id : var.existing_bucket_name
+  artifacts_bucket_id = var.create_new_storage ? aws_s3_bucket.artifacts[0].id : var.existing_bucket_name
 }
 
 # Create bucket - Terraform will manage it going forward
 resource "aws_s3_bucket" "artifacts" {
-  count  = var.create_bucket ? 1 : 0
+  count  = var.create_new_storage ? 1 : 0
   bucket = var.existing_bucket_name
   tags   = local.tags
 
@@ -32,7 +32,7 @@ resource "aws_s3_bucket" "artifacts" {
 }
 
 resource "aws_s3_bucket_cors_configuration" "artifacts" {
-  count  = var.create_bucket ? 1 : 0
+  count  = var.create_new_storage ? 1 : 0
   bucket = local.artifacts_bucket_id
 
   cors_rule {
@@ -172,13 +172,13 @@ resource "aws_instance" "main" {
   instance_type          = "t2.micro"
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   subnet_id              = aws_subnet.public.id
-  iam_instance_profile   = local.instance_profile_name
+  iam_instance_profile   = var.existing_ec2_role_name != "" ? local.instance_profile_name : null
   
   # EC2 initialization script
   # Unfortunately, AWS requires the parameter to be called user_data - there's no way around this. 
   user_data = base64encode(templatefile("${path.module}/ec2-init.sh", {
     instance_name = var.instance_name
-    ecr_repo_url  = aws_ecr_repository.rukmer_app.repository_url
+    ecr_repo_url  = local.ecr_repository_url
     region        = var.region
   }))
 
@@ -209,6 +209,7 @@ resource "aws_instance" "main" {
 
 # Data source for existing IAM role
 data "aws_iam_role" "existing_ec2_role" {
+  count = var.existing_ec2_role_name != "" ? 1 : 0
   name = var.existing_ec2_role_name
 }
 
@@ -216,32 +217,48 @@ data "aws_iam_role" "existing_ec2_role" {
 locals {
   # Always use existing IAM resources
   has_iam_resources = length(var.iam_ssh_users) > 0
-  ec2_role_name = data.aws_iam_role.existing_ec2_role.name 
+  ec2_role_name = var.existing_ec2_role_name != "" ? data.aws_iam_role.existing_ec2_role[0].name : null
   instance_profile_name = var.existing_ec2_role_name
+  
+  # ECR repository URL - use existing or newly created
+  ecr_repository_url = var.create_new_storage ? aws_ecr_repository.rukmer_app[0].repository_url : data.aws_ecr_repository.existing_rukmer_app[0].repository_url
 }
 
 # Data source for existing IAM group
 data "aws_iam_group" "existing_user_group" {
-  count      = length(var.iam_ssh_users) > 0 ? 1 : 0
+  count      = length(var.iam_ssh_users) > 0 && var.existing_user_group_name != "" ? 1 : 0
   group_name = var.existing_user_group_name
 }
 
 # ---------------------------------------------
 # ECR Repository for Elixir Application
 # ---------------------------------------------
+# Create ECR repository only if create_new_storage is true
 resource "aws_ecr_repository" "rukmer_app" {
-  name                 = "${var.project_name}-elixir-app"
+  count                = var.create_new_storage ? 1 : 0
+  name                 = "${var.project_name}-rukmer-app-${var.environment}"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
+  lifecycle {
+    prevent_destroy = true
+  }
+
   tags = local.tags
 }
 
+# Data source for existing ECR repository
+data "aws_ecr_repository" "existing_rukmer_app" {
+  count = var.create_new_storage ? 0 : 1
+  name  = var.existing_ecr_repository_name
+}
+
 resource "aws_ecr_lifecycle_policy" "rukmer_app_policy" {
-  repository = aws_ecr_repository.rukmer_app.name
+  count      = var.create_new_storage ? 1 : 0
+  repository = aws_ecr_repository.rukmer_app[0].name
 
   policy = jsonencode({
     rules = [

@@ -18,7 +18,7 @@ output "connect_to_instance" {
 
 output "ecr_repository_url" {
   description = "ECR repository URL for the Elixir application"
-  value       = aws_ecr_repository.rukmer_app.repository_url
+  value       = local.ecr_repository_url
 }
 
 output "docker_commands" {
@@ -26,10 +26,10 @@ output "docker_commands" {
   value = <<-EOT
     Build and deploy your Elixir application:
     
-    1. Build: docker build -t rukmer-app .
-    2. Tag: docker tag rukmer-app:latest ${aws_ecr_repository.rukmer_app.repository_url}:latest
-    3. Login: aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${aws_ecr_repository.rukmer_app.repository_url}
-    4. Push: docker push ${aws_ecr_repository.rukmer_app.repository_url}:latest
+    1. Build: cd ../src && docker build --no-cache -t rukmer-app .
+    2. Tag: docker tag rukmer-app:latest ${local.ecr_repository_url}:latest
+    3. Login: aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${local.ecr_repository_url}
+    4. Push: docker push ${local.ecr_repository_url}:latest
     5. Deploy: aws ssm start-session --target ${aws_instance.main.id}
               ./deploy.sh
   EOT
