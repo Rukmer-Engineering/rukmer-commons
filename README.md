@@ -90,6 +90,9 @@ docker run -p 4000:4000 rukmer-app
     # Connect to EC2 instance
     aws ssm start-session --target YOUR_INSTANCE_ID
 
+    # Switch to ec2-user (deploy.sh is in ec2-user's home directory)
+    sudo su - ec2-user
+
     # Run deployment script
     ./deploy.sh
    ```
