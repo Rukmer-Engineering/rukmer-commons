@@ -219,6 +219,42 @@ data "aws_iam_group" "existing_user_group" {
 }
 
 # ---------------------------------------------
+# ECR Repository for Elixir Application
+# ---------------------------------------------
+resource "aws_ecr_repository" "rukmer_app" {
+  name                 = "${var.project_name}-elixir-app"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = local.tags
+}
+
+resource "aws_ecr_lifecycle_policy" "rukmer_app_policy" {
+  repository = aws_ecr_repository.rukmer_app.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 10 images"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["v"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 10
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+# ---------------------------------------------
 # Cognito User Pool for Marketplace API Authentication
 # ---------------------------------------------
 resource "aws_cognito_user_pool" "main" {
