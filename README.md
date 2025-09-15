@@ -57,8 +57,17 @@ cd src
 
 # Build and test locally
 docker build --no-cache -t rukmer-app .
-docker run -p 4000:4000 rukmer-app
+docker run -p 8080:4000 rukmer-app
 ```
+
+## Port Configuration
+
+The application uses the following port mapping:
+
+- **Internal (Container)**: Port `4000` - Elixir app runs on this port inside the Docker container
+- **External (EC2)**: Port `8080` - Accessible from outside the container via this port
+- **Local Development**: Port `8080` - When testing locally with `docker run -p 8080:4000`
+
 
 ### Deploy to Production
 
