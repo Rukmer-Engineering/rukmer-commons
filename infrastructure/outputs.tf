@@ -1,13 +1,3 @@
-output "ec2_public_ip" {
-  description = "Public IP address of the EC2 instance"
-  value       = aws_instance.main.public_ip
-}
-
-output "ec2_public_dns" {
-  description = "Public DNS name of the EC2 instance"
-  value       = aws_instance.main.public_dns
-}
-
 output "instance_id" {
   description = "EC2 instance ID for Session Manager"
   value       = aws_instance.main.id
@@ -15,28 +5,55 @@ output "instance_id" {
 
 output "connect_to_instance" {
   description = "How to connect to your EC2 instance"
-  value = <<-EOT
-    Connect to EC2 Instance via Session Manager:
+  value = <<EOF
 
-    1. Install Session Manager plugin (one-time):
-       brew install --cask session-manager-plugin
+CONNECT TO EC2 INSTANCE
+────────────────────────────────────────
 
-    2. Connect to your instance:
-       aws ssm start-session --target ${aws_instance.main.id}
+1. Install Session Manager plugin (one-time):
+   brew install --cask session-manager-plugin
 
-    ✅ Uses your existing AWS IAM credentials
-    ✅ No SSH ports open to internet
-    ✅ Individual authentication & audit trails
-    ✅ Works immediately - no key setup required
-  EOT
+2. Connect to your instance:
+   aws ssm start-session --target ${aws_instance.main.id}
+
+────────────────────────────────────────
+EOF
 }
 
-output "authorized_users" {
-  description = "IAM users authorized for SSH access"
-  value = length(var.iam_ssh_users) > 0 ? var.iam_ssh_users : ["No users configured - add to iam_ssh_users variable"]
+output "ecr_repository_url" {
+  description = "ECR repository URL for the Elixir application"
+  value       = local.ecr_repository_url
 }
 
-output "connection_command" {
-  description = "Ready-to-use command to connect to your instance"
-  value = "aws ssm start-session --target ${aws_instance.main.id}"
+output "docker_commands" {
+  description = "Commands to deploy your Elixir Docker image"
+  value = <<EOF
+
+BUILD AND DEPLOY ELIXIR APPLICATION
+────────────────────────────────────────
+
+1. Build Docker image:
+   cd ../src
+   docker build --no-cache -t rukmer-app .
+
+2. Tag for ECR:
+   docker tag rukmer-app:latest ${local.ecr_repository_url}:latest
+
+3. Login to ECR:
+   aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${local.ecr_repository_url}
+
+4. Push to ECR:
+   docker push ${local.ecr_repository_url}:latest
+
+5. Deploy to EC2:
+   aws ssm start-session --target ${aws_instance.main.id}
+
+6. Run deployment script:
+   sudo su - ec2-user
+   ./deploy.sh
+
+────────────────────────────────────────
+App will be available at: http://[EC2_PUBLIC_IP]:8080/
+────────────────────────────────────────
+EOF
 }

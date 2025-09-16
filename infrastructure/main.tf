@@ -7,33 +7,25 @@ locals {
     Project     = var.project_name
     Environment = var.environment
   }
-  
-  # Reference to the S3 bucket (conditional)
-  artifacts_bucket_id = var.create_bucket ? aws_s3_bucket.artifacts[0].id : var.existing_bucket_name
 }
-
-# ---------------------------------------------
-# S3 Bucket for App Assets
-# ---------------------------------------------
 
 # Create bucket - Terraform will manage it going forward
 resource "aws_s3_bucket" "artifacts" {
-  count  = var.create_bucket ? 1 : 0
+  count  = var.create_new_storage ? 1 : 0
   bucket = var.existing_bucket_name
   tags   = local.tags
 
   lifecycle {
-    # prevent_destroy = true  # Temporarily disabled for destroy
+    prevent_destroy = true  
     ignore_changes = [
-      bucket,
       tags,
     ]
   }
 }
 
 resource "aws_s3_bucket_cors_configuration" "artifacts" {
-  count  = var.create_bucket ? 1 : 0
-  bucket = local.artifacts_bucket_id
+  count  = var.create_new_storage ? 1 : 0
+  bucket = var.create_new_storage ? aws_s3_bucket.artifacts[0].id : var.existing_bucket_name
 
   cors_rule {
     allowed_headers = ["*"]
@@ -63,7 +55,7 @@ data "aws_ami" "amazon_linux" {
   
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["amzn2-ami-hvm-*-arm64-gp2"]  # ARM64 AMI
   }
   
   filter {
@@ -134,15 +126,6 @@ resource "aws_security_group" "ec2_sg" {
   description = "Security group for EC2 instance"
   vpc_id      = aws_vpc.main.id
 
-  # Ingress rules
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   ingress {
     description = "HTTPS"
     from_port   = 443
@@ -152,13 +135,12 @@ resource "aws_security_group" "ec2_sg" {
   }
 
   ingress {
-    description = "[LEGACY] SSH access for backward compatibility"
-    from_port   = 22
-    to_port     = 22
+    description = "Elixir App"
+    from_port   = 8080
+    to_port     = 8080
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
   # Egress rules - REQUIRED for SSM to work
   egress {
     description = "All outbound traffic for SSM and updates"
@@ -174,28 +156,35 @@ resource "aws_security_group" "ec2_sg" {
 }
 
 # ---------------------------------------------
-# EC2 Instance - MODERN Session Manager enabled
+# EC2 Instance - Session Manager enabled
 # ---------------------------------------------
 resource "aws_instance" "main" {
   ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t2.micro"
+  instance_type          = "t4g.medium"  # ARM-based Graviton processor
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   subnet_id              = aws_subnet.public.id
-  iam_instance_profile   = local.instance_profile_name # [MODERN] Session Manager access (optional)
+  iam_instance_profile   = var.existing_ec2_role_name != "" ? local.instance_profile_name : null
   
-  # Enhanced user data for both access methods
-  user_data = <<-EOF
-              #!/bin/bash
-              yum update -y
-              yum install -y httpd amazon-ssm-agent
-              systemctl start httpd amazon-ssm-agent
-              systemctl enable httpd amazon-ssm-agent
-              echo "<h1>Hello from ${var.instance_name}</h1>" > /var/www/html/index.html
-              
-              # Log setup completion
-              echo "Instance setup completed at $(date)" >> /var/log/setup.log
-              echo "SSH-via-Session-Manager enabled" >> /var/log/setup.log
-              EOF
+  # EC2 initialization script
+  user_data_base64 = base64encode(templatefile("${path.module}/ec2-init.sh", {
+    instance_name = var.instance_name
+    ecr_repo_url  = local.ecr_repository_url
+    region        = var.region
+  }))
+
+  lifecycle {
+    ignore_changes = [user_data_base64, ami]
+  }
+
+   metadata_options {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+    http_put_response_hop_limit = 1
+  }
+
+  root_block_device {
+    encrypted = true
+  }
 
   tags = {
     Name = var.instance_name
@@ -210,6 +199,7 @@ resource "aws_instance" "main" {
 
 # Data source for existing IAM role
 data "aws_iam_role" "existing_ec2_role" {
+  count = var.existing_ec2_role_name != "" ? 1 : 0
   name = var.existing_ec2_role_name
 }
 
@@ -217,14 +207,66 @@ data "aws_iam_role" "existing_ec2_role" {
 locals {
   # Always use existing IAM resources
   has_iam_resources = length(var.iam_ssh_users) > 0
-  ec2_role_name = data.aws_iam_role.existing_ec2_role.name 
+  ec2_role_name = var.existing_ec2_role_name != "" ? data.aws_iam_role.existing_ec2_role[0].name : null
   instance_profile_name = var.existing_ec2_role_name
+  
+  # ECR repository URL - use existing or newly created
+  ecr_repository_url = var.create_new_storage ? aws_ecr_repository.rukmer_app[0].repository_url : data.aws_ecr_repository.existing_rukmer_app[0].repository_url
 }
 
 # Data source for existing IAM group
 data "aws_iam_group" "existing_user_group" {
-  count      = length(var.iam_ssh_users) > 0 ? 1 : 0
+  count      = length(var.iam_ssh_users) > 0 && var.existing_user_group_name != "" ? 1 : 0
   group_name = var.existing_user_group_name
+}
+
+# ---------------------------------------------
+# ECR Repository for Elixir Application
+# ---------------------------------------------
+# Create ECR repository only if create_new_storage is true
+resource "aws_ecr_repository" "rukmer_app" {
+  count                = var.create_new_storage ? 1 : 0
+  name                 = "${var.project_name}-rukmer-app-${var.environment}"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  tags = local.tags
+}
+
+# Data source for existing ECR repository
+data "aws_ecr_repository" "existing_rukmer_app" {
+  count = var.create_new_storage ? 0 : 1
+  name  = var.existing_ecr_repository_name
+}
+
+resource "aws_ecr_lifecycle_policy" "rukmer_app_policy" {
+  count      = var.create_new_storage ? 1 : 0
+  repository = aws_ecr_repository.rukmer_app[0].name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 10 images"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["v"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 10
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
 }
 
 # ---------------------------------------------
