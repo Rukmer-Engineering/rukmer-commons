@@ -49,8 +49,8 @@ EOF
 # ---------------------------------------------
 
 output "database_endpoint" {
-  description = "RDS instance endpoint"
-  value       = aws_db_instance.main.endpoint
+  description = "RDS instance endpoint (hostname only)"
+  value       = aws_db_instance.main.address
 }
 
 output "database_port" {
@@ -74,13 +74,13 @@ Add these to your Elixir app configuration:
 config :rukmer_marketplace, RukmerMarketplace.Repo,
   username: "${aws_db_instance.main.username}",
   password: "${var.db_password}",
-  hostname: "${aws_db_instance.main.endpoint}",
+  hostname: "${aws_db_instance.main.address}",
   database: "${aws_db_instance.main.db_name}",
   port: ${aws_db_instance.main.port},
   pool_size: ${var.db_pool_size}
 
 Environment variables for production:
-DATABASE_URL=postgresql://${aws_db_instance.main.username}:${var.db_password}@${aws_db_instance.main.endpoint}:${aws_db_instance.main.port}/${aws_db_instance.main.db_name}
+DATABASE_URL=postgresql://${aws_db_instance.main.username}:${var.db_password}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${aws_db_instance.main.db_name}
 
 ────────────────────────────────────────
 EOF
