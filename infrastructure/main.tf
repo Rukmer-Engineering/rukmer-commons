@@ -163,7 +163,7 @@ resource "aws_instance" "main" {
   instance_type          = "t4g.medium"  # ARM-based Graviton processor
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   subnet_id              = aws_subnet.public.id
-  iam_instance_profile   = var.existing_ec2_role_name != "" ? local.instance_profile_name : null
+  iam_instance_profile   = var.ec2_session_manager_role != "" ? local.instance_profile_name : null
   
   # EC2 initialization script
   user_data_base64 = base64encode(templatefile("${path.module}/ec2-init.sh", {
@@ -199,16 +199,16 @@ resource "aws_instance" "main" {
 
 # Data source for existing IAM role
 data "aws_iam_role" "existing_ec2_role" {
-  count = var.existing_ec2_role_name != "" ? 1 : 0
-  name = var.existing_ec2_role_name
+  count = var.ec2_session_manager_role != "" ? 1 : 0
+  name = var.ec2_session_manager_role
 }
 
 # Local value to reference existing IAM resources
 locals {
   # Always use existing IAM resources
   has_iam_resources = length(var.iam_ssh_users) > 0
-  ec2_role_name = var.existing_ec2_role_name != "" ? data.aws_iam_role.existing_ec2_role[0].name : null
-  instance_profile_name = var.existing_ec2_role_name
+  ec2_role_name = var.ec2_session_manager_role != "" ? data.aws_iam_role.existing_ec2_role[0].name : null
+  instance_profile_name = var.ec2_session_manager_role
   
   # ECR repository URL - use existing or newly created
   ecr_repository_url = var.create_new_storage ? aws_ecr_repository.rukmer_app[0].repository_url : data.aws_ecr_repository.existing_rukmer_app[0].repository_url

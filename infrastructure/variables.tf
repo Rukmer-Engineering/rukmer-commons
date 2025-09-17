@@ -79,7 +79,7 @@ variable "iam_ssh_users" {
 # Use Existing IAM Resources (if you don't have IAM create permissions)
 # ---------------------------------------------
 
-variable "existing_ec2_role_name" {
+variable "ec2_session_manager_role" {
   description = "Name of existing IAM role for EC2 Session Manager"
   type        = string
   default     = ""

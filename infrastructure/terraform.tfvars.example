@@ -6,7 +6,7 @@ allowed_origins = ["http://localhost:8080", ""]
 
 # EC2 Instance and IAM Resources for Session Manager
 instance_name = "your-instance-name"
-existing_ec2_role_name = ""  # Set to existing role name or leave empty to create new
+ec2_session_manager_role = ""  # Set to existing role name or leave empty to create new
 existing_user_group_name = ""  # Set to existing group name or leave empty
 iam_ssh_users = []  # List of IAM usernames for Session Manager access
 
