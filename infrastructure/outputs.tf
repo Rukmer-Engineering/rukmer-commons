@@ -43,3 +43,46 @@ App will be available at: http://[EC2_PUBLIC_IP]:8080/
 ────────────────────────────────────────
 EOF
 }
+
+# ---------------------------------------------
+# RDS Database Outputs
+# ---------------------------------------------
+
+output "database_endpoint" {
+  description = "RDS instance endpoint"
+  value       = aws_db_instance.main.endpoint
+}
+
+output "database_port" {
+  description = "RDS instance port"
+  value       = aws_db_instance.main.port
+}
+
+output "database_name" {
+  description = "Database name"
+  value       = aws_db_instance.main.db_name
+}
+
+output "database_connection_info" {
+  description = "Database connection information for your Elixir app"
+  value = <<EOF
+
+DATABASE CONNECTION DETAILS
+────────────────────────────────────────
+Add these to your Elixir app configuration:
+
+config :rukmer_marketplace, RukmerMarketplace.Repo,
+  username: "${aws_db_instance.main.username}",
+  password: "${var.db_password}",
+  hostname: "${aws_db_instance.main.endpoint}",
+  database: "${aws_db_instance.main.db_name}",
+  port: ${aws_db_instance.main.port},
+  pool_size: ${var.db_pool_size}
+
+Environment variables for production:
+DATABASE_URL=postgresql://${aws_db_instance.main.username}:${var.db_password}@${aws_db_instance.main.endpoint}:${aws_db_instance.main.port}/${aws_db_instance.main.db_name}
+
+────────────────────────────────────────
+EOF
+  sensitive = true
+}

@@ -90,3 +90,77 @@ variable "existing_user_group_name" {
   type        = string
   default     = ""
 }
+
+# ---------------------------------------------
+# RDS Database Configuration
+# ---------------------------------------------
+
+variable "db_instance_class" {
+  description = "RDS instance class"
+  type        = string
+  default     = "db.t3.micro"  # Free tier eligible
+}
+
+variable "db_allocated_storage" {
+  description = "Initial allocated storage for RDS (GB)"
+  type        = number
+  default     = 20
+}
+
+variable "db_max_allocated_storage" {
+  description = "Maximum allocated storage for RDS auto-scaling (GB)"
+  type        = number
+  default     = 100
+}
+
+variable "db_name" {
+  description = "Database name"
+  type        = string
+  default     = "rukmer_marketplace"
+}
+
+variable "db_username" {
+  description = "Database master username"
+  type        = string
+  default     = "rukmer_admin"
+}
+
+variable "db_password" {
+  description = "Database master password"
+  type        = string
+  sensitive   = true
+}
+
+variable "db_backup_retention_days" {
+  description = "Number of days to retain database backups"
+  type        = number
+  default     = 7
+}
+
+variable "db_pool_size" {
+  description = "Database connection pool size for Elixir app"
+  type        = number
+  default     = 10
+}
+
+# ---------------------------------------------
+# Database Public Access Configuration
+# ---------------------------------------------
+
+variable "db_publicly_accessible" {
+  description = "Whether the RDS instance should be publicly accessible"
+  type        = bool
+  default     = false
+}
+
+variable "allowed_db_cidr_blocks" {
+  description = "List of CIDR blocks allowed to access the database"
+  type        = list(string)
+  default     = []
+}
+
+variable "existing_rds_monitoring_role_name" {
+  description = "Name of existing IAM role for RDS Enhanced Monitoring (managed outside Terraform)"
+  type        = string
+  default     = ""
+}

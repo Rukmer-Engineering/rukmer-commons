@@ -345,3 +345,139 @@ resource "aws_cognito_user_group" "publisher" {
   user_pool_id = aws_cognito_user_pool.main.id
   precedence   = 2
 }
+
+# ---------------------------------------------
+# RDS Database for Marketplace API
+# ---------------------------------------------
+
+# Private subnets for RDS (security best practice)
+# AWS RDS requires a DB Subnet Group with subnets in at least 2 different Availability Zones (AZs)
+resource "aws_subnet" "rukmer_marketplace_db_1" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = data.aws_availability_zones.available.names[0]
+
+  tags = {
+    Name = "${var.instance_name}-rukmer-marketplace-db-subnet-1"
+  }
+}
+
+resource "aws_subnet" "rukmer_marketplace_db_2" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.3.0/24"
+  availability_zone = data.aws_availability_zones.available.names[1]
+
+  tags = {
+    Name = "${var.instance_name}-rukmer-marketplace-db-subnet-2"
+  }
+}
+
+# Route tables for database subnets 
+# Use public route table when db_publicly_accessible is true, private otherwise
+resource "aws_route_table" "rukmer_marketplace_db" {
+  count  = var.db_publicly_accessible ? 0 : 1
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "${var.instance_name}-rukmer-marketplace-db-rt"
+  }
+}
+
+resource "aws_route_table_association" "rukmer_marketplace_db_1" {
+  subnet_id      = aws_subnet.rukmer_marketplace_db_1.id
+  route_table_id = var.db_publicly_accessible ? aws_route_table.public.id : aws_route_table.rukmer_marketplace_db[0].id
+}
+
+resource "aws_route_table_association" "rukmer_marketplace_db_2" {
+  subnet_id      = aws_subnet.rukmer_marketplace_db_2.id
+  route_table_id = var.db_publicly_accessible ? aws_route_table.public.id : aws_route_table.rukmer_marketplace_db[0].id
+}
+
+# DB Subnet Group
+resource "aws_db_subnet_group" "main" {
+  name       = "${var.project_name}-db-subnet-group"
+  subnet_ids = [aws_subnet.rukmer_marketplace_db_1.id, aws_subnet.rukmer_marketplace_db_2.id]
+
+  tags = {
+    Name = "${var.project_name}-db-subnet-group"
+  }
+}
+
+# Security Group for RDS
+resource "aws_security_group" "rds_sg" {
+  name        = "${var.instance_name}-rds-sg"
+  description = "Security group for RDS PostgreSQL database"
+  vpc_id      = aws_vpc.main.id
+
+  # Allow PostgreSQL access from EC2 security group
+  ingress {
+    description     = "PostgreSQL from EC2"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ec2_sg.id]
+  }
+
+  # Allow PostgreSQL access from specified CIDR blocks (when public access is enabled)
+  dynamic "ingress" {
+    for_each = var.db_publicly_accessible && length(var.allowed_db_cidr_blocks) > 0 ? [1] : []
+    content {
+      description = "PostgreSQL from allowed IPs"
+      from_port   = 5432
+      to_port     = 5432
+      protocol    = "tcp"
+      cidr_blocks = var.allowed_db_cidr_blocks
+    }
+  }
+
+  tags = {
+    Name = "${var.instance_name}-rds-sg"
+  }
+}
+
+# RDS Instance
+resource "aws_db_instance" "main" {
+  identifier     = "${var.project_name}-db-${var.environment}"
+  engine         = "postgres"
+  engine_version = "15.7"
+  instance_class = var.db_instance_class
+
+  allocated_storage     = var.db_allocated_storage
+  max_allocated_storage = var.db_max_allocated_storage
+  storage_type          = "gp3"
+  storage_encrypted     = true
+
+  db_name  = var.db_name
+  username = var.db_username
+  password = var.db_password
+
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  
+  # Public access configuration
+  publicly_accessible = var.db_publicly_accessible
+
+  # Backup configuration
+  backup_retention_period = var.db_backup_retention_days
+  backup_window          = "03:00-04:00"  # UTC
+  maintenance_window     = "sun:04:00-sun:05:00"  # UTC
+
+  # Performance and monitoring (simplified to avoid service-linked role requirement)
+  performance_insights_enabled = false
+  monitoring_interval         = 0
+
+  # Security (minimal for development)
+  deletion_protection = false  # Allow deletion for dev environment
+  skip_final_snapshot = true   # Skip snapshot for faster deletion
+
+  # Auto minor version updates
+  auto_minor_version_upgrade = true
+
+  tags = merge(local.tags, {
+    Name = "${var.project_name}-database"
+  })
+
+  lifecycle {
+    ignore_changes = [password]
+  }
+}
