@@ -3,23 +3,6 @@ output "instance_id" {
   value       = aws_instance.main.id
 }
 
-output "connect_to_instance" {
-  description = "How to connect to your EC2 instance"
-  value = <<EOF
-
-CONNECT TO EC2 INSTANCE
-────────────────────────────────────────
-
-1. Install Session Manager plugin (one-time):
-   brew install --cask session-manager-plugin
-
-2. Connect to your instance:
-   aws ssm start-session --target ${aws_instance.main.id}
-
-────────────────────────────────────────
-EOF
-}
-
 output "ecr_repository_url" {
   description = "ECR repository URL for the Elixir application"
   value       = local.ecr_repository_url
@@ -31,6 +14,9 @@ output "docker_commands" {
 
 BUILD AND DEPLOY ELIXIR APPLICATION
 ────────────────────────────────────────
+
+0. Install Session Manager plugin if not installed (one-time):
+   brew install --cask session-manager-plugin
 
 1. Build Docker image:
    cd ../src
