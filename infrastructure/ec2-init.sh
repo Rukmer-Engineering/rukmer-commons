@@ -28,11 +28,29 @@ rm -rf awscliv2.zip aws/
 cat > /home/ec2-user/deploy.sh << 'EOF'
 #!/bin/bash
 echo "🚀 Deploying app..."
+
+# Individual database variables (no URL encoding needed)
+DB_HOST="${db_host}"
+DB_PORT="${db_port}"
+DB_NAME="${db_name}"
+DB_USER="${db_user}"
+DB_PASSWORD="${db_password}"
+
 aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${ecr_repo_url}
 docker pull ${ecr_repo_url}:latest
 docker stop app 2>/dev/null || true
 docker rm app 2>/dev/null || true  
-docker run -d --name app --restart unless-stopped -p 8080:4000 ${ecr_repo_url}:latest
+
+docker run -d --name app --restart unless-stopped \
+  --network host \
+  -e DB_HOST="$DB_HOST" \
+  -e DB_PORT="$DB_PORT" \
+  -e DB_NAME="$DB_NAME" \
+  -e DB_USER="$DB_USER" \
+  -e DB_PASSWORD="$DB_PASSWORD" \
+  -e PORT=8080 \
+  ${ecr_repo_url}:latest
+
 echo "✅ Done"
 EOF
 

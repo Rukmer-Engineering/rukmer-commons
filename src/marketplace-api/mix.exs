@@ -20,6 +20,9 @@ defmodule MarketplaceApi.MixProject do
 
   defp deps do
     [
+      {:ecto_sql, "~> 3.10"},
+      {:postgrex, ">= 0.0.0"},
+      {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.5"}
     ]
   end

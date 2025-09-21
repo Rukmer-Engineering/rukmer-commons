@@ -9,7 +9,6 @@ locals {
   }
 }
 
-# Create bucket - Terraform will manage it going forward
 resource "aws_s3_bucket" "artifacts" {
   count  = var.create_new_storage ? 1 : 0
   bucket = var.existing_bucket_name
@@ -48,7 +47,6 @@ resource "aws_s3_bucket_cors_configuration" "artifacts" {
 # EC2 Instance Resources
 # ---------------------------------------------
 
-# Data sources
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -68,7 +66,6 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
-# VPC
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
@@ -79,7 +76,6 @@ resource "aws_vpc" "main" {
   }
 }
 
-# Internet Gateway
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -88,7 +84,6 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# Public Subnet
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
@@ -100,7 +95,6 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Route Table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -114,13 +108,11 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Route Table Association
 resource "aws_route_table_association" "public" {
   subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.public.id
 }
 
-# Security Group
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.instance_name}-sg"
   description = "Security group for EC2 instance"
@@ -141,7 +133,7 @@ resource "aws_security_group" "ec2_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  # Egress rules - REQUIRED for SSM to work
+
   egress {
     description = "All outbound traffic for SSM and updates"
     from_port   = 0
@@ -170,6 +162,11 @@ resource "aws_instance" "main" {
     instance_name = var.instance_name
     ecr_repo_url  = local.ecr_repository_url
     region        = var.region
+    db_host       = aws_db_instance.main.address
+    db_port       = aws_db_instance.main.port
+    db_name       = aws_db_instance.main.db_name
+    db_user       = aws_db_instance.main.username
+    db_password   = aws_db_instance.main.password
   }))
 
   lifecycle {
@@ -197,13 +194,11 @@ resource "aws_instance" "main" {
 # REQUIRED: These enable the EC2 instance to communicate with Session Manager
 # ---------------------------------------------
 
-# Data source for existing IAM role
 data "aws_iam_role" "existing_ec2_role" {
   count = var.ec2_session_manager_role != "" ? 1 : 0
   name = var.ec2_session_manager_role
 }
 
-# Local value to reference existing IAM resources
 locals {
   # Always use existing IAM resources
   has_iam_resources = length(var.iam_ssh_users) > 0
@@ -214,7 +209,6 @@ locals {
   ecr_repository_url = var.create_new_storage ? aws_ecr_repository.rukmer_app[0].repository_url : data.aws_ecr_repository.existing_rukmer_app[0].repository_url
 }
 
-# Data source for existing IAM group
 data "aws_iam_group" "existing_user_group" {
   count      = length(var.iam_ssh_users) > 0 && var.existing_user_group_name != "" ? 1 : 0
   group_name = var.existing_user_group_name
@@ -223,7 +217,6 @@ data "aws_iam_group" "existing_user_group" {
 # ---------------------------------------------
 # ECR Repository for Elixir Application
 # ---------------------------------------------
-# Create ECR repository only if create_new_storage is true
 resource "aws_ecr_repository" "rukmer_app" {
   count                = var.create_new_storage ? 1 : 0
   name                 = "${var.project_name}-rukmer-app-${var.environment}"
@@ -403,13 +396,11 @@ resource "aws_db_subnet_group" "main" {
   }
 }
 
-# Security Group for RDS
 resource "aws_security_group" "rds_sg" {
   name        = "${var.instance_name}-rds-sg"
   description = "Security group for RDS PostgreSQL database"
   vpc_id      = aws_vpc.main.id
 
-  # Allow PostgreSQL access from EC2 security group
   ingress {
     description     = "PostgreSQL from EC2"
     from_port       = 5432
@@ -418,7 +409,6 @@ resource "aws_security_group" "rds_sg" {
     security_groups = [aws_security_group.ec2_sg.id]
   }
 
-  # Allow PostgreSQL access from specified CIDR blocks (when public access is enabled)
   dynamic "ingress" {
     for_each = var.db_publicly_accessible && length(var.allowed_db_cidr_blocks) > 0 ? [1] : []
     content {
@@ -435,7 +425,6 @@ resource "aws_security_group" "rds_sg" {
   }
 }
 
-# RDS Instance
 resource "aws_db_instance" "main" {
   identifier     = "${var.project_name}-db-${var.environment}"
   engine         = "postgres"
@@ -454,24 +443,21 @@ resource "aws_db_instance" "main" {
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
   db_subnet_group_name   = aws_db_subnet_group.main.name
   
-  # Public access configuration
   publicly_accessible = var.db_publicly_accessible
 
-  # Backup configuration
   backup_retention_period = var.db_backup_retention_days
-  backup_window          = "03:00-04:00"  # UTC
-  maintenance_window     = "sun:04:00-sun:05:00"  # UTC
+  backup_window          = "03:00-04:00" 
+  maintenance_window     = "sun:04:00-sun:05:00" 
 
-  # Performance and monitoring (simplified to avoid service-linked role requirement)
   performance_insights_enabled = false
   monitoring_interval         = 0
 
-  # Security (minimal for development)
   deletion_protection = false  # Allow deletion for dev environment
   skip_final_snapshot = true   # Skip snapshot for faster deletion
 
-  # Auto minor version updates
   auto_minor_version_upgrade = true
+
+  parameter_group_name = aws_db_parameter_group.main.name
 
   tags = merge(local.tags, {
     Name = "${var.project_name}-database"
@@ -480,4 +466,17 @@ resource "aws_db_instance" "main" {
   lifecycle {
     ignore_changes = [password]
   }
+}
+
+# Parameter group to disable SSL requirement - allows plain TCP connections
+resource "aws_db_parameter_group" "main" {
+  family = "postgres15"
+  name   = "${var.project_name}-db-params-${var.environment}"
+
+  parameter {
+    name  = "rds.force_ssl"
+    value = "0"  # Disable SSL requirement - allows non-SSL connections
+  }
+
+  tags = local.tags
 }
