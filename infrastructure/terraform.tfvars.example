@@ -6,21 +6,9 @@ allowed_origins = ["http://localhost:8080", ""]
 
 # EC2 Instance and IAM Resources for Session Manager
 instance_name = "your-instance-name"
-# IMPORTANT: Set this to your existing EC2 role for Session Manager access
-existing_ec2_role_name = "your-ec2-session-manager-role-name"
-existing_user_group_name = "your-iam-group-name"
-
-# Just list your existing IAM usernames - Terraform handles the rest!
-iam_ssh_users = [
-  # Example usernames (replace with your actual IAM users):
-  # "john.doe",
-  # "jane.smith", 
-  # "developer1"
-  
-  # How to find your IAM username:
-  # Run: aws sts get-caller-identity --query "UserId" --output text
-  # Or check in AWS Console > IAM > Users
-]
+ec2_session_manager_role = ""  # Set to existing role name or leave empty to create new
+existing_user_group_name = ""  # Set to existing group name or leave empty
+iam_ssh_users = []  # List of IAM usernames for Session Manager access
 
 # Storage Resources (S3 Bucket and ECR Repository)
 # Set create_new_storage = true to create new resources
@@ -29,5 +17,17 @@ create_new_storage = false
 existing_bucket_name = "your-existing-s3-bucket-name"
 existing_ecr_repository_name = "your-existing-ecr-repo-name"
 
+# Database Configuration
+db_instance_class = "db.t3.micro"  # Free tier eligible
+db_allocated_storage = 20
+db_max_allocated_storage = 100
+db_name = "rukmer_marketplace"
+db_username = "rukmer_admin"
+db_password = "your-secure-password-here"
+db_backup_retention_days = 7
+db_pool_size = 10
+existing_rds_monitoring_role_name = ""  # Managed outside Terraform
 
-
+# Database Public Access Configuration
+db_publicly_accessible = false  # Set to true for development/testing
+allowed_db_cidr_blocks = []  # List of IP addresses allowed to access database

@@ -3,23 +3,6 @@ output "instance_id" {
   value       = aws_instance.main.id
 }
 
-output "connect_to_instance" {
-  description = "How to connect to your EC2 instance"
-  value = <<EOF
-
-CONNECT TO EC2 INSTANCE
-────────────────────────────────────────
-
-1. Install Session Manager plugin (one-time):
-   brew install --cask session-manager-plugin
-
-2. Connect to your instance:
-   aws ssm start-session --target ${aws_instance.main.id}
-
-────────────────────────────────────────
-EOF
-}
-
 output "ecr_repository_url" {
   description = "ECR repository URL for the Elixir application"
   value       = local.ecr_repository_url
@@ -36,6 +19,9 @@ output "docker_commands" {
 
 BUILD AND DEPLOY ELIXIR APPLICATION
 ────────────────────────────────────────
+
+0. Install Session Manager plugin if not installed (one-time):
+   brew install --cask session-manager-plugin
 
 1. Build Docker image:
    cd ../src
@@ -61,4 +47,47 @@ BUILD AND DEPLOY ELIXIR APPLICATION
 App will be available at: http://[EC2_PUBLIC_IP]:8080/
 ────────────────────────────────────────
 EOF
+}
+
+# ---------------------------------------------
+# RDS Database Outputs
+# ---------------------------------------------
+
+output "database_endpoint" {
+  description = "RDS instance endpoint (hostname only)"
+  value       = aws_db_instance.main.address
+}
+
+output "database_port" {
+  description = "RDS instance port"
+  value       = aws_db_instance.main.port
+}
+
+output "database_name" {
+  description = "Database name"
+  value       = aws_db_instance.main.db_name
+}
+
+output "database_connection_info" {
+  description = "Database connection information for your Elixir app"
+  value = <<EOF
+
+DATABASE CONNECTION DETAILS
+────────────────────────────────────────
+Add these to your Elixir app configuration:
+
+config :rukmer_marketplace, RukmerMarketplace.Repo,
+  username: "${aws_db_instance.main.username}",
+  password: "${var.db_password}",
+  hostname: "${aws_db_instance.main.address}",
+  database: "${aws_db_instance.main.db_name}",
+  port: ${aws_db_instance.main.port},
+  pool_size: ${var.db_pool_size}
+
+Environment variables for production:
+DATABASE_URL=postgresql://${aws_db_instance.main.username}:${var.db_password}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${aws_db_instance.main.db_name}
+
+────────────────────────────────────────
+EOF
+  sensitive = true
 }

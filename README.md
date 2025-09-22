@@ -105,6 +105,9 @@ The application uses the following port mapping:
 
     # Run deployment script
     ./deploy.sh
+
+    # Inspect the health of the app
+    curl http://localhost:8080/health
    ```
 
 ## Infrastructure Management
@@ -153,8 +156,17 @@ cd infrastructure & terraform destroy
 ### Useful Debugging Commands
 
 ```bash
-# list all remote S3 buckets
+# List all remote S3 buckets
 aws s3 ls
+
+# List all current terraform states
+cd infrastructure && terraform state list
+
+# Remove a divergent state resource 
+terraform state rm aws_instance.main
+
+# Re-import a resource that's existing on the current AWS
+terraform import aws_instance.main NEW_INSTANCE_ID
 
 # List all remote EC2 instances
 aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name,Tags[?Key==`Name`].Value|[0],IamInstanceProfile.Arn]' --output table
@@ -179,7 +191,7 @@ docker logs app --tail 50
 docker ps -a
 
 # Test health endpoint in EC2
-curl http://PUBLIC_IP/api/health
+curl http://localhost:8080/health
 ```
 
 ## Next Steps
