@@ -25,6 +25,11 @@ output "ecr_repository_url" {
   value       = local.ecr_repository_url
 }
 
+output "aws_region" {
+  description = "AWS region"
+  value       = var.region
+}
+
 output "docker_commands" {
   description = "Commands to deploy your Elixir Docker image"
   value = <<EOF
