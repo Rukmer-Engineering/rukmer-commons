@@ -3,6 +3,11 @@ output "instance_id" {
   value       = aws_instance.main.id
 }
 
+output "app_url" {
+  description = "Application URL"
+  value       = "http://${aws_lb.main.dns_name}"
+}
+
 output "ecr_repository_url" {
   description = "ECR repository URL for the Elixir application"
   value       = local.ecr_repository_url
