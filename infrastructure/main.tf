@@ -2,6 +2,16 @@ provider "aws" {
   region = var.region
 }
 
+terraform { 
+  cloud { 
+    organization = "rukmer-inc" 
+
+    workspaces { 
+      name = "terraform-rukmer" 
+    } 
+  } 
+}
+
 locals {
   tags = {
     Project     = var.project_name
