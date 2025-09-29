@@ -129,23 +129,15 @@ resource "aws_security_group" "ec2_sg" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Elixir App"
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    description     = "App from ALB"
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   egress {
-    description = "All outbound traffic for SSM and updates"
+    description = "All outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -347,6 +339,150 @@ resource "aws_cognito_user_group" "publisher" {
   description  = "Publisher group with access to publishing features"
   user_pool_id = aws_cognito_user_pool.main.id
   precedence   = 2
+}
+
+# =============================================================================
+# ALB WITH HTTP (HTTPS READY)
+# =============================================================================
+# Current: HTTP-only ALB that forwards traffic to EC2
+# Future: Add domain to terraform.tfvars to automatically enable HTTPS
+# See: README-HTTPS-UPGRADE.md for upgrade instructions
+# =============================================================================
+
+# ALB Security Group
+resource "aws_security_group" "alb_sg" {
+  name        = "${var.instance_name}-alb-sg"
+  description = "Security group for ALB"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "All outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.instance_name}-alb-sg"
+  }
+}
+
+resource "aws_lb" "main" {
+  name               = "${var.instance_name}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = [aws_subnet.public.id, aws_subnet.rukmer_marketplace_db_1.id]
+
+  tags = local.tags
+}
+
+resource "aws_lb_target_group" "main" {
+  name     = "${var.instance_name}-tg"
+  port     = 8080
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+
+  health_check {
+    path = "/health"
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lb_target_group_attachment" "main" {
+  target_group_arn = aws_lb_target_group.main.arn
+  target_id        = aws_instance.main.id
+  port             = 8080
+}
+
+# HTTPS listener (only created if domain is provided)
+resource "aws_lb_listener" "https" {
+  count             = var.domain_name != "" ? 1 : 0
+  load_balancer_arn = aws_lb.main.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
+  certificate_arn   = aws_acm_certificate_validation.main[0].certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.main.arn
+  }
+}
+
+# HTTP listener - redirects to HTTPS if domain exists, otherwise forwards
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type = var.domain_name != "" ? "redirect" : "forward"
+    
+    # Redirect to HTTPS if domain exists
+    dynamic "redirect" {
+      for_each = var.domain_name != "" ? [1] : []
+      content {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+    
+    # Forward to target group if no domain
+    target_group_arn = var.domain_name == "" ? aws_lb_target_group.main.arn : null
+  }
+}
+
+# SSL Certificate (only created if domain is provided)
+resource "aws_acm_certificate" "main" {
+  count           = var.domain_name != "" ? 1 : 0
+  domain_name     = var.domain_name
+  validation_method = "DNS"
+
+  tags = local.tags
+}
+
+# Certificate validation records
+resource "aws_route53_record" "validation" {
+  for_each = var.domain_name != "" ? {
+    for dvo in aws_acm_certificate.main[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  } : {}
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = var.route53_zone_id
+}
+
+resource "aws_acm_certificate_validation" "main" {
+  count           = var.domain_name != "" ? 1 : 0
+  certificate_arn = aws_acm_certificate.main[0].arn
+  validation_record_fqdns = [for record in aws_route53_record.validation : record.fqdn]
 }
 
 # ---------------------------------------------

@@ -164,3 +164,15 @@ variable "existing_rds_monitoring_role_name" {
   type        = string
   default     = ""
 }
+
+variable "domain_name" {
+  description = "Domain name for SSL certificate (optional)"
+  type        = string
+  default     = ""
+}
+
+variable "route53_zone_id" {
+  description = "Route53 hosted zone ID (required if domain_name is set)"
+  type        = string
+  default     = ""
+}
