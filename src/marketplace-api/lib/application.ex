@@ -6,11 +6,13 @@ defmodule MarketplaceApi.Application do
     children = [
       # Database connection
       MarketplaceApi.Repo,
-
-
-      {Plug.Cowboy, scheme: :http, plug: HelloWorld, options: [port: String.to_integer(System.get_env("PORT") || "4000")]}
+      {
+        Plug.Cowboy,
+        scheme: :http,
+        plug: HelloWorld,
+        options: [port: String.to_integer(System.get_env("PORT") || "4000")]
+      }
     ]
-
     opts = [strategy: :one_for_one, name: MarketplaceApi.Supervisor]
     Supervisor.start_link(children, opts)
   end
