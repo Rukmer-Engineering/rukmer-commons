@@ -158,9 +158,3 @@ variable "allowed_db_cidr_blocks" {
   type        = list(string)
   default     = []
 }
-
-variable "existing_rds_monitoring_role_name" {
-  description = "Name of existing IAM role for RDS Enhanced Monitoring (managed outside Terraform)"
-  type        = string
-  default     = ""
-}
