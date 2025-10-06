@@ -138,10 +138,10 @@ sudo su - ec2-user
 
 ## Port Configuration
 
-- **Internal (Container)**: Port `4000` - Elixir app runs inside Docker container
-- **External (EC2)**: Port `8080` - Accessible from outside the container
-- **Local Development (Phoenix)**: Port `4000` - Phoenix server runs directly (no Docker)
-- **Local Development (Docker)**: Port `8080` - When testing with `docker run -p 8080:4000`
+- **All Environments**: Port `4000` - Consistent across all environments
+  - **Local Development (Phoenix)**: `http://localhost:4000` - Phoenix server runs directly (no Docker)
+  - **Local Development (Docker)**: `http://localhost:4000` - When testing with `docker run -p 4000:4000`
+  - **Production (EC2)**: `http://YOUR_EC2_IP:4000` - Accessible from the internet
 
 ## Infrastructure Management
 

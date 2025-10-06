@@ -1,7 +1,10 @@
 import Config
 
 if config_env() == :prod do
+  port = String.to_integer(System.get_env("PORT") || "4000")
+
   config :marketplace_api, MarketplaceApiWeb.Endpoint,
+    http: [ip: {0, 0, 0, 0}, port: port],
     server: true,
     secret_key_base: System.get_env("SECRET_KEY_BASE") ||
       raise("Missing SECRET_KEY_BASE environment variable"),

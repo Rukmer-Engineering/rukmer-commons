@@ -138,8 +138,8 @@ resource "aws_security_group" "ec2_sg" {
 
   ingress {
     description = "Elixir App"
-    from_port   = 8080
-    to_port     = 8080
+    from_port   = 4000
+    to_port     = 4000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -169,14 +169,18 @@ resource "aws_instance" "main" {
   
   # EC2 initialization script
   user_data_base64 = base64encode(templatefile("${path.module}/ec2-init.sh", {
-    instance_name = var.instance_name
-    ecr_repo_url  = local.ecr_repository_url
-    region        = var.region
-    db_host       = aws_db_instance.main.address
-    db_port       = aws_db_instance.main.port
-    db_name       = aws_db_instance.main.db_name
-    db_user       = aws_db_instance.main.username
-    db_password   = aws_db_instance.main.password
+    instance_name       = var.instance_name
+    ecr_repo_url        = local.ecr_repository_url
+    region              = var.region
+    db_host             = aws_db_instance.main.address
+    db_port             = aws_db_instance.main.port
+    db_name             = aws_db_instance.main.db_name
+    db_user             = aws_db_instance.main.username
+    db_password         = aws_db_instance.main.password
+    secret_key_base     = var.phoenix_secret_key_base
+    signing_salt        = var.phoenix_signing_salt
+    cognito_user_pool_id = aws_cognito_user_pool.main.id
+    cognito_client_id   = aws_cognito_user_pool_client.client.id
   }))
 
   lifecycle {

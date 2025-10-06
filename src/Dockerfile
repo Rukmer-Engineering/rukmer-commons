@@ -28,4 +28,4 @@ USER app
 EXPOSE 4000
 
 # Start with the release (no mix required at runtime)
-CMD ["/app/_build/prod/rel/marketplace_api/bin/marketplace_api", "start_iex"]
+CMD ["/app/_build/prod/rel/marketplace_api/bin/marketplace_api", "start"]
