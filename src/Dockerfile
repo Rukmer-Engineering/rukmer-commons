@@ -1,4 +1,4 @@
-FROM hexpm/elixir:1.15.7-erlang-26.1.2-alpine-3.18.4
+FROM hexpm/elixir:1.18.4-erlang-27.0-alpine-3.18.4
 
 # Install dependencies
 RUN apk add --no-cache build-base curl
