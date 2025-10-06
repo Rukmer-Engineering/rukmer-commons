@@ -28,9 +28,9 @@ brew install --cask session-manager-plugin
 # Install Elixir/Erlang via asdf (for local development)
 brew install asdf
 asdf install erlang 27.0
-asdf install elixir 1.18.4-otp-27
+asdf install elixir 1.17.3-otp-27
 asdf global erlang 27.0
-asdf global elixir 1.18.4-otp-27
+asdf global elixir 1.17.3-otp-27
 ```
 
 ## Quick Start
@@ -89,13 +89,19 @@ Visit: http://localhost:4000
 
 ### Build and Push Docker Image to ECR
 
+The Docker build process creates a self-contained release that includes:
+- Compiled Elixir application
+- BEAM VM runtime
+- All dependencies
+- Start/stop scripts
+
 ```bash
 # Get configuration from Terraform
 cd infrastructure
 export ECR_URL=$(terraform output -raw ecr_repository_url)
 export REGION=$(terraform output -raw aws_region)
 
-# Build Docker image (ARM64 for Graviton EC2)
+# Build Docker image - creates production release inside
 cd ../src
 docker build --no-cache -t rukmer-app .
 
@@ -109,6 +115,13 @@ aws ecr get-login-password --region $REGION | \
 # Push to ECR
 docker push $ECR_URL:latest
 ```
+
+**What happens during `docker build`:**
+1. Copies source code and config files
+2. Installs dependencies via Mix
+3. Compiles Elixir code (MIX_ENV=prod)
+4. Creates standalone release via `mix release`
+5. Final container runs the release binary (no Mix needed!)
 
 ### Deploy to EC2
 
@@ -209,12 +222,23 @@ rukmer-commons/
 │   ├── outputs.tf          # Output values
 │   └── terraform.tfvars    # Secret values (gitignored)
 ├── src/
+│   ├── Dockerfile          # Builds production release
 │   └── marketplace-api/    # Phoenix LiveView application
 │       ├── lib/
-│       │   ├── marketplace_api/      # Business logic (services, models)
-│       │   └── marketplace_api_web/  # Web interface (LiveView, endpoint, router)
-│       ├── config/         # Application configuration
-│       └── mix.exs         # Elixir dependencies
+│       │   ├── application.ex           # App startup
+│       │   ├── repo.ex                  # Database connection
+│       │   ├── services/                # Business logic (AWS Cognito)
+│       │   └── marketplace_api_web/     # Web interface
+│       │       ├── endpoint.ex          # HTTP entry point
+│       │       ├── router.ex            # Routes
+│       │       ├── live/                # LiveView pages
+│       │       ├── components/          # Reusable UI components
+│       │       └── errors/              # Error handlers
+│       ├── config/
+│       │   ├── config.exs       # Compile-time config (dev defaults)
+│       │   └── runtime.exs      # Runtime config (prod environment vars)
+│       ├── mix.exs              # Dependencies & release config
+│       └── mix.lock             # Locked dependency versions
 ├── local_deploy.sh         # Automated deployment script
 └── start_dev.sh           # Automated local development setup
 ```

@@ -1,4 +1,4 @@
-FROM hexpm/elixir:1.18.4-erlang-27.0-alpine-3.18.4
+FROM hexpm/elixir:1.17-erlang-27-alpine-3.20
 
 # Install dependencies
 RUN apk add --no-cache build-base curl
@@ -6,7 +6,7 @@ RUN apk add --no-cache build-base curl
 WORKDIR /app
 
 # Copy project files from marketplace-api subdirectory
-COPY marketplace-api/mix.exs ./
+COPY marketplace-api/mix.exs marketplace-api/mix.lock ./
 COPY marketplace-api/config ./config
 COPY marketplace-api/lib ./lib
 
