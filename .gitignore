@@ -4,5 +4,19 @@
 
 */**/terraform.tfstate*
 
-rukmer-inc-design/*
+rukmer-tech-design/*
 
+# Elixir/Phoenix compiled files
+_build/
+deps/
+*.beam
+*.ez
+.elixir_ls/
+.mix/
+erl_crash.dump
+priv/static/
+.env
+.env.local
+
+# OS files
+.DS_Store
