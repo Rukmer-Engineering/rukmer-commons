@@ -121,9 +121,6 @@ sudo su - ec2-user
 
 # Run deployment script
 ./deploy.sh
-
-# Verify deployment
-curl http://localhost:8080/health
 ```
 
 ## Port Configuration
@@ -191,9 +188,6 @@ docker logs app --tail 50
 
 # Check container status (run inside EC2)
 docker ps -a
-
-# Test health endpoint (run inside EC2)
-curl http://localhost:8080/health
 
 # Terraform state management
 cd infrastructure
