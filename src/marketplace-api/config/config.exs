@@ -26,6 +26,23 @@ config :marketplace_api, MarketplaceApiWeb.Endpoint,
     layout: false
   ]
 
+# Development environment configuration
+if Mix.env() == :dev do
+  config :marketplace_api, MarketplaceApiWeb.Endpoint,
+    # Enable code reloading in dev
+    debug_errors: true,
+    code_reloader: true,
+    check_origin: false,
+    # Watch files for changes and trigger live reload
+    live_reload: [
+      patterns: [
+        ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$",
+        ~r"priv/gettext/.*(po)$",
+        ~r"lib/marketplace_api_web/(controllers|live|components)/.*(ex|heex)$"
+      ]
+    ]
+end
+
 # AWS Cognito Configuration
 # For dev: empty values (not needed locally)
 # For prod: configure in runtime.exs with actual values from EC2 environment
