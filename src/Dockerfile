@@ -7,6 +7,7 @@ WORKDIR /app
 
 # Copy project files from marketplace-api subdirectory
 COPY marketplace-api/mix.exs ./
+COPY marketplace-api/config ./config
 COPY marketplace-api/lib ./lib
 
 # Install hex and rebar, get deps, compile, and create release as root
