@@ -4,7 +4,7 @@ defmodule MarketplaceApiWeb.Endpoint do
   @session_options [
     store: :cookie,
     key: "_marketplace_api_key",
-    signing_salt: Application.compile_env(:phoenix_live_view, :signing_salt)
+    signing_salt: Application.compile_env!(:marketplace_api, [MarketplaceApiWeb.Endpoint, :session_signing_salt])
   ]
 
   socket "/live", Phoenix.LiveView.Socket,

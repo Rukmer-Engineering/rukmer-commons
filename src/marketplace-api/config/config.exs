@@ -19,6 +19,7 @@ config :marketplace_api, MarketplaceApiWeb.Endpoint,
   # Hardcoded for dev (safe), production will override in runtime.exs if needed
   secret_key_base: "dev-secret-key-base-at-least-64-chars-long-for-local-dev-only-never-prod",
   live_view: [signing_salt: "dev-signing-salt-for-local-development"],
+  session_signing_salt: "marketplace_api_session",
   pubsub_server: MarketplaceApi.PubSub,
   render_errors: [
     formats: [html: MarketplaceApiWeb.ErrorHTML, json: MarketplaceApiWeb.ErrorJSON],
