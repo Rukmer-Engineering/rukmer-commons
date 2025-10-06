@@ -10,17 +10,15 @@ config :marketplace_api, MarketplaceApi.Repo,
 # Use Jason for JSON
 config :phoenix, :json_library, Jason
 
-# LiveView signing salt - uses env var in production, safe default for dev
-config :phoenix_live_view,
-  signing_salt: System.get_env("SIGNING_SALT") || "dev-salt-not-for-production"
-
 # Phoenix Endpoint configuration
+# Dev: 127.0.0.1 (localhost only) | Prod: 0.0.0.0 (Docker needs this)
+ip_binding = if Mix.env() == :prod, do: {0, 0, 0, 0}, else: {127, 0, 0, 1}
+
 config :marketplace_api, MarketplaceApiWeb.Endpoint,
-  http: [ip: {127, 0, 0, 1}, port: 4000],
-  # IMPORTANT: Set SECRET_KEY_BASE environment variable in production!
-  # Generate with: mix phx.gen.secret
-  secret_key_base: System.get_env("SECRET_KEY_BASE"),
-  live_view: [signing_salt: System.get_env("SIGNING_SALT")],
+  http: [ip: ip_binding, port: 4000],
+  # Hardcoded for dev (safe), production will override in runtime.exs if needed
+  secret_key_base: "dev-secret-key-base-at-least-64-chars-long-for-local-dev-only-never-prod",
+  live_view: [signing_salt: "dev-signing-salt-for-local-development"],
   pubsub_server: MarketplaceApi.PubSub,
   render_errors: [
     formats: [html: MarketplaceApiWeb.ErrorHTML, json: MarketplaceApiWeb.ErrorJSON],
@@ -28,14 +26,17 @@ config :marketplace_api, MarketplaceApiWeb.Endpoint,
   ]
 
 # AWS Cognito Configuration
-# IMPORTANT: Run `terraform output cognito_setup_instructions` to get these values
+# For dev: empty values (not needed locally)
+# For prod: configure in runtime.exs with actual values from EC2 environment
 config :marketplace_api, :cognito,
-  user_pool_id: System.get_env("COGNITO_USER_POOL_ID") || "",
-  client_id: System.get_env("COGNITO_CLIENT_ID") || "",
-  region: System.get_env("AWS_REGION") || "us-east-1"
+  user_pool_id: "",
+  client_id: "",
+  region: "us-east-1"
 
-# AWS SDK configuration - uses IAM role on EC2
+# AWS SDK configuration
+# For dev: nil values (not needed locally)
+# For prod: configure in runtime.exs or use IAM role on EC2
 config :marketplace_api, :aws,
-  access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
-  secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY"),
-  region: System.get_env("AWS_REGION")
+  access_key_id: nil,
+  secret_access_key: nil,
+  region: "us-east-1"
