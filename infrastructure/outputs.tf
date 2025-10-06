@@ -1,93 +1,36 @@
-output "local_deploy_script" {
-  description = "Local deployment script"
-  value       = "cd {root_directory} && ./local_deploy.sh"
+# ---------------------------------------------
+# Outputs for Local Development
+# ---------------------------------------------
+
+output "phoenix_env_vars" {
+  description = "Environment variables for local Phoenix development - copy/paste into terminal"
+  value = <<-EOT
+    # Copy and paste these into your terminal:
+    export SECRET_KEY_BASE="${var.phoenix_secret_key_base}"
+    export SIGNING_SALT="${var.phoenix_signing_salt}"
+    export COGNITO_USER_POOL_ID="${aws_cognito_user_pool.main.id}"
+    export COGNITO_CLIENT_ID="${aws_cognito_user_pool_client.client.id}"
+    export AWS_REGION="${var.region}"
+  EOT
+  sensitive = true
+}
+
+# ---------------------------------------------
+# Outputs for Deployment Scripts
+# ---------------------------------------------
 
 output "ecr_repository_url" {
-  description = "ECR repository URL for the Elixir application"
+  description = "ECR repository URL (used by local_deploy.sh)"
   value       = local.ecr_repository_url
 }
 
 output "aws_region" {
-  description = "AWS region"
+  description = "AWS region (used by deployment scripts)"
   value       = var.region
 }
 
-output "docker_commands" {
-  description = "AWS region"
-  value       = var.region
+output "instance_id" {
+  description = "EC2 instance ID (used by local_deploy.sh)"
+  value       = aws_instance.main.id
 }
 
-output "docker_commands" {
-  description = "Commands to deploy your Elixir Docker image"
-  value = "
-
-    1. Build Docker image:
-   cd ../src
-   docker build --no-cache -t rukmer-app .
-
-   2. Tag for ECR:
-   docker tag rukmer-app:latest ${local.ecr_repository_url}:latest
-
-   3. Login to ECR: 
-   aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${local.ecr_repository_url}
-
-   4. Push to ECR:
-   docker push ${local.ecr_repository_url}:latest
-  "
-}
-
-output "docker_commands" {
-  description = "Commands to deploy your Elixir Docker image to EC2 instance via Session Manager"
-  value = "
-
-  1. Deploy to EC2:
-  aws ssm start-session --target ${aws_instance.main.id}
-
-  2. Run deployment script:
-   sudo su - ec2-user
-   ./deploy.sh
-  "
-}
-
-# ---------------------------------------------
-# RDS Database Outputs
-# ---------------------------------------------
-
-output "database_endpoint" {
-  description = "RDS instance endpoint (hostname only)"
-  value       = aws_db_instance.main.address
-}
-
-output "database_port" {
-  description = "RDS instance port"
-  value       = aws_db_instance.main.port
-}
-
-output "database_name" {
-  description = "Database name"
-  value       = aws_db_instance.main.db_name
-}
-
-output "database_connection_info" {
-  description = "Database connection information for your Elixir app"
-  value = <<EOF
-
-DATABASE CONNECTION DETAILS
-────────────────────────────────────────
-Add these to your Elixir app configuration:
-
-config :rukmer_marketplace, RukmerMarketplace.Repo,
-  username: "${aws_db_instance.main.username}",
-  password: "${var.db_password}",
-  hostname: "${aws_db_instance.main.address}",
-  database: "${aws_db_instance.main.db_name}",
-  port: ${aws_db_instance.main.port},
-  pool_size: ${var.db_pool_size}
-
-Environment variables for production:
-DATABASE_URL=postgresql://${aws_db_instance.main.username}:${var.db_password}@${aws_db_instance.main.address}:${aws_db_instance.main.port}/${aws_db_instance.main.db_name}
-
-────────────────────────────────────────
-EOF
-  sensitive = true
-}
