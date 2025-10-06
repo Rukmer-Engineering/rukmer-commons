@@ -158,3 +158,18 @@ variable "allowed_db_cidr_blocks" {
   type        = list(string)
   default     = []
 }
+
+# ---------------------------------------------
+# Phoenix App Secrets
+# ---------------------------------------------
+variable "phoenix_secret_key_base" {
+  description = "Phoenix secret_key_base for session encryption (64+ chars)"
+  type        = string
+  sensitive   = true
+}
+
+variable "phoenix_signing_salt" {
+  description = "Phoenix signing_salt for cookie signing (32+ chars)"
+  type        = string
+  sensitive   = true
+}

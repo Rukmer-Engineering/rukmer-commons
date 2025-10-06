@@ -350,6 +350,50 @@ resource "aws_cognito_user_group" "publisher" {
 }
 
 # ---------------------------------------------
+# IAM Policy for EC2 to access Cognito
+# ---------------------------------------------
+resource "aws_iam_policy" "ec2_cognito_access" {
+  name        = "${var.project_name}-ec2-cognito-policy-${var.environment}"
+  description = "Allow EC2 to access Cognito for user authentication"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminInitiateAuth",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminUpdateUserAttributes",
+          "cognito-idp:AdminDeleteUser",
+          "cognito-idp:ListUsers",
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:DescribeUserPoolClient",
+          "cognito-idp:InitiateAuth",
+          "cognito-idp:SignUp",
+          "cognito-idp:ConfirmSignUp",
+          "cognito-idp:GetUser"
+        ]
+        Resource = [
+          aws_cognito_user_pool.main.arn
+        ]
+      }
+    ]
+  })
+
+  tags = local.tags
+}
+
+# Attach Cognito policy to existing EC2 role
+resource "aws_iam_role_policy_attachment" "ec2_cognito_access" {
+  count      = var.ec2_session_manager_role != "" ? 1 : 0
+  role       = data.aws_iam_role.existing_ec2_role[0].name
+  policy_arn = aws_iam_policy.ec2_cognito_access.arn
+}
+
+# ---------------------------------------------
 # RDS Database for Marketplace API
 # ---------------------------------------------
 
@@ -438,7 +482,7 @@ resource "aws_security_group" "rds_sg" {
 resource "aws_db_instance" "main" {
   identifier     = "${var.project_name}-db-${var.environment}"
   engine         = "postgres"
-  engine_version = "15.7"
+  engine_version = "15.12"
   instance_class = var.db_instance_class
 
   allocated_storage     = var.db_allocated_storage
