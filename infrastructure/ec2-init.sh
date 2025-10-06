@@ -48,7 +48,12 @@ docker run -d --name app --restart unless-stopped \
   -e DB_NAME="$DB_NAME" \
   -e DB_USER="$DB_USER" \
   -e DB_PASSWORD="$DB_PASSWORD" \
-  -e PORT=8080 \
+  -e PORT=4000 \
+  -e SECRET_KEY_BASE="${secret_key_base}" \
+  -e SIGNING_SALT="${signing_salt}" \
+  -e COGNITO_USER_POOL_ID="${cognito_user_pool_id}" \
+  -e COGNITO_CLIENT_ID="${cognito_client_id}" \
+  -e AWS_REGION="${region}" \
   ${ecr_repo_url}:latest
 
 echo "✅ Done"

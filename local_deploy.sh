@@ -37,7 +37,10 @@ echo "Instance ID: $INSTANCE_ID"
 
 # Step 1: Build Docker image
 echo ""
-echo "Step 1: Building Docker image..."
+echo "Step 1: Building Docker image (with Elixir release)..."
+echo "  - This compiles your Elixir code"
+echo "  - Creates a self-contained release via 'mix release'"
+echo "  - No Mix or Elixir needed on EC2!"
 cd src
 docker build --no-cache -t rukmer-app .
 cd ..

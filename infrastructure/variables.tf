@@ -159,8 +159,17 @@ variable "allowed_db_cidr_blocks" {
   default     = []
 }
 
-variable "existing_rds_monitoring_role_name" {
-  description = "Name of existing IAM role for RDS Enhanced Monitoring (managed outside Terraform)"
+# ---------------------------------------------
+# Phoenix App Secrets
+# ---------------------------------------------
+variable "phoenix_secret_key_base" {
+  description = "Phoenix secret_key_base for session encryption (64+ chars)"
   type        = string
-  default     = ""
+  sensitive   = true
+}
+
+variable "phoenix_signing_salt" {
+  description = "Phoenix signing_salt for cookie signing (32+ chars)"
+  type        = string
+  sensitive   = true
 }
