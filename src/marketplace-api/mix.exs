@@ -5,7 +5,7 @@ defmodule MarketplaceApi.MixProject do
     [
       app: :marketplace_api,
       version: "0.1.0",
-      elixir: "1.18.4-otp-27",
+      elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -20,10 +20,26 @@ defmodule MarketplaceApi.MixProject do
 
   defp deps do
     [
+      # Database
       {:ecto_sql, "~> 3.10"},
       {:postgrex, ">= 0.0.0"},
-      {:jason, "~> 1.4"},
-      {:plug_cowboy, "~> 2.5"}
+
+      # Phoenix LiveView (includes Jason automatically)
+      {:phoenix, "~> 1.7.0"},
+      {:phoenix_live_view, "~> 0.20.0"},
+      {:phoenix_html, "~> 3.3"},
+      {:phoenix_live_reload, "~> 1.4", only: :dev},
+      {:plug_cowboy, "~> 2.7"},
+
+      # UI Components
+      {:salad_ui, "~> 0.9.0"},
+      {:tails, "~> 0.1.5"},
+
+      # AWS Cognito Integration
+      {:aws, "~> 1.0.9"},
+
+      # JSON library (required by Phoenix and AWS SDK)
+      {:jason, "~> 1.4"}
     ]
   end
 end
