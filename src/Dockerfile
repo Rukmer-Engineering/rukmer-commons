@@ -1,4 +1,4 @@
-FROM hexpm/elixir:1.15.7-erlang-26.1.2-alpine-3.18.4
+FROM elixir:1.17-alpine
 
 # Install dependencies
 RUN apk add --no-cache build-base curl
@@ -6,7 +6,8 @@ RUN apk add --no-cache build-base curl
 WORKDIR /app
 
 # Copy project files from marketplace-api subdirectory
-COPY marketplace-api/mix.exs ./
+COPY marketplace-api/mix.exs marketplace-api/mix.lock ./
+COPY marketplace-api/config ./config
 COPY marketplace-api/lib ./lib
 
 # Install hex and rebar, get deps, compile, and create release as root
@@ -26,9 +27,5 @@ USER app
 
 EXPOSE 4000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:4000/health || exit 1
-
 # Start with the release (no mix required at runtime)
-CMD ["/app/_build/prod/rel/marketplace_api/bin/marketplace_api", "start_iex"]
+CMD ["/app/_build/prod/rel/marketplace_api/bin/marketplace_api", "start"]

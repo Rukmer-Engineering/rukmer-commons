@@ -4,12 +4,13 @@ A containerized Elixir marketplace platform for drone software distribution, ena
 
 ## Architecture Overview
 
-- **Elixir + Phoenix**: Web application framework with LiveView
+- **Elixir + Phoenix LiveView**: Real-time web UI with authentication
+- **AWS Cognito**: User authentication and authorization
 - **Docker**: Containerized deployment
 - **AWS ECR**: Private container registry
 - **AWS EC2**: Application hosting with Session Manager access
+- **AWS RDS (PostgreSQL)**: Database for application data
 - **AWS S3**: Artifact storage for drone software packages
-- **AWS Cognito**: User authentication and authorization
 - **Terraform**: Infrastructure as Code
 
 ### Prerequisites
@@ -18,185 +19,233 @@ A containerized Elixir marketplace platform for drone software distribution, ena
 2. **Docker Desktop** installed and running
 3. **Terraform** installed
 4. **Session Manager plugin** for AWS CLI
+5. **Elixir & Erlang** (for local Phoenix development)
 
 ```bash
 # Install Session Manager plugin (macOS)
 brew install --cask session-manager-plugin
+
+# Install Elixir/Erlang via asdf (for local development)
+brew install asdf
+asdf install erlang 27.0
+asdf install elixir 1.17.3-otp-27
+asdf global erlang 27.0
+asdf global elixir 1.17.3-otp-27
 ```
 
-### Initial Setup
+## Quick Start
 
-1. **Configure Terraform variables**
-   ```bash
-   cd infrastructure
-   cp terraform.tfvars.example terraform.tfvars
-   # Edit terraform.tfvars with your AWS configuration
-   ```
-
-2. **Initialize and deploy infrastructure**
-   ```bash
-   cd infrastructure
-   terraform init
-   terraform plan
-   terraform refresh
-   terraform apply
-   ```
-
-3. **Get deployment commands**
-   ```bash
-   terraform output docker_commands
-   ```
-
-## Development Workflow
-
-### Local Development
+### 1. Sync with Terraform Cloud
 
 ```bash
-# Navigate to the src directory
-cd src
+# Clone the repository
+cd rukmer-commons/infrastructure
 
-# Build and test locally
+# Login to Terraform Cloud (syncs remote state)
+terraform login
+
+# Refresh local state from cloud
+terraform refresh
+```
+
+**Note:** The infrastructure is already deployed and managed via Terraform Cloud. You just need to sync the state locally.
+
+### 2. Local Development (Phoenix LiveView)
+
+**Option A: Automated (Recommended)**
+```bash
+# From project root - handles everything automatically
+./start_dev.sh
+```
+
+**Option B: Manual**
+```bash
+# Get environment variables from Terraform
+cd infrastructure
+terraform output -raw phoenix_env_vars
+# Copy and paste the export commands into your terminal
+
+# Start Phoenix server
+cd ../src/marketplace-api
+mix deps.get
+mix phx.server
+```
+
+Visit: http://localhost:4000
+
+**See [src/marketplace-api/SETUP.md](src/marketplace-api/SETUP.md) for detailed setup instructions.**
+
+### 3. Deploy Application to Production
+
+**Option A: Automated (Recommended)**
+```bash
+# From project root - builds, pushes, and deploys automatically
+./local_deploy.sh
+```
+
+**Option B: Manual Steps** (see Manual Deployment Steps below)
+
+## Manual Deployment Steps
+
+### Build and Push Docker Image to ECR
+
+The Docker build process creates a self-contained release that includes:
+- Compiled Elixir application
+- BEAM VM runtime
+- All dependencies
+- Start/stop scripts
+
+```bash
+# Get configuration from Terraform
+cd infrastructure
+export ECR_URL=$(terraform output -raw ecr_repository_url)
+export REGION=$(terraform output -raw aws_region)
+
+# Build Docker image - creates production release inside
+cd ../src
 docker build --no-cache -t rukmer-app .
-docker run -p 8080:4000 rukmer-app
+
+# Tag for ECR
+docker tag rukmer-app:latest $ECR_URL:latest
+
+# Login to ECR
+aws ecr get-login-password --region $REGION | \
+  docker login --username AWS --password-stdin $ECR_URL
+
+# Push to ECR
+docker push $ECR_URL:latest
+```
+
+**What happens during `docker build`:**
+1. Copies source code and config files
+2. Installs dependencies via Mix
+3. Compiles Elixir code (MIX_ENV=prod)
+4. Creates standalone release via `mix release`
+5. Final container runs the release binary (no Mix needed!)
+
+### Deploy to EC2
+
+```bash
+# Connect to EC2 instance via Session Manager
+aws ssm start-session --target $INSTANCE_ID
+
+# Once connected, switch to ec2-user
+sudo su - ec2-user
+
+# Run deployment script
+./deploy.sh
 ```
 
 ## Port Configuration
 
-The application uses the following port mapping:
-
-- **Internal (Container)**: Port `4000` - Elixir app runs on this port inside the Docker container
-- **External (EC2)**: Port `8080` - Accessible from outside the container via this port
-- **Local Development**: Port `8080` - When testing locally with `docker run -p 8080:4000`
-
-
-### Deploy to Production
-
-1. **Build and push to ECR**
-    Use the terraform output to get build instructions
-    ```bash
-    cd infrastructure & terraform output docker_commands
-    ```
-
-    The terraform output (once terraform has been applied at least once), should have the following
-    ```bash
-    # Build application (from src directory) - ARM64 for Graviton EC2
-    docker build --no-cache -t rukmer-app .
-
-    # Tag for ECR (use output from terraform)
-    docker tag rukmer-app:latest {YOUR_ECR_URL}:latest
-
-    # Authenticate with ECR
-    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_ECR_URL
-
-    # Push to registry
-    docker push YOUR_ECR_URL:latest
-    ```
-
-2. **Deploy to EC2**
-   ```bash
-    # Find the EC2 instance running the Elixir app if it has previously been deployed
-    aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name,Tags[?Key==`Name`].Value|[0],IamInstanceProfile.Arn]' --output table
-
-    # Connect to EC2 instance
-    aws ssm start-session --target YOUR_INSTANCE_ID
-
-    # Switch to ec2-user (deploy.sh is in ec2-user's home directory)
-    sudo su - ec2-user
-
-    # Run deployment script
-    ./deploy.sh
-
-    # Inspect the health of the app
-    curl http://localhost:8080/health
-   ```
+- **All Environments**: Port `4000` - Consistent across all environments
+  - **Local Development (Phoenix)**: `http://localhost:4000` - Phoenix server runs directly (no Docker)
+  - **Local Development (Docker)**: `http://localhost:4000` - When testing with `docker run -p 4000:4000`
+  - **Production (EC2)**: `http://YOUR_EC2_IP:4000` - Accessible from the internet
 
 ## Infrastructure Management
 
 ### Terraform Commands
 
 ```bash
-# Change directory to infrastructure
+# From infrastructure directory
 cd infrastructure
-
-# Initialize Terraform
 terraform init
-
-# Preview changes
 terraform plan
-
-# Refresh state and apply changes
-terraform refresh
 terraform apply
-
-# View outputs
+terraform output
 terraform destroy
 
-# View outputs
-terraform output
-
-# alternatively you can use the one-liner commands at the root level
+# OR from project root using -chdir
 terraform -chdir=infrastructure init
 terraform -chdir=infrastructure plan
-terraform -chdir=infrastructure refresh
 terraform -chdir=infrastructure apply
 terraform -chdir=infrastructure output
 terraform -chdir=infrastructure destroy
-...
+```
 
-cd infrastructure & terraform init
-cd infrastructure & terraform plan
-cd infrastructure & terraform refresh
-cd infrastructure & terraform apply
-cd infrastructure & terraform output
-cd infrastructure & terraform destroy
-...
+### Useful Terraform Outputs
+
+```bash
+# Get all Phoenix environment variables for local development
+terraform -chdir=infrastructure output -raw phoenix_env_vars
+
+# Get ECR repository URL
+terraform -chdir=infrastructure output -raw ecr_repository_url
+
+# Get EC2 instance ID
+terraform -chdir=infrastructure output -raw instance_id
+
+# Get AWS region
+terraform -chdir=infrastructure output -raw aws_region
 ```
 
 
-### Useful Debugging Commands
+### Debugging Commands
 
 ```bash
-# List all remote S3 buckets
-aws s3 ls
+# List all EC2 instances
+aws ec2 describe-instances \
+  --query 'Reservations[*].Instances[*].[InstanceId,State.Name,Tags[?Key==`Name`].Value|[0]]' \
+  --output table
 
-# List all current terraform states
-cd infrastructure && terraform state list
-
-# Remove a divergent state resource 
-terraform state rm aws_instance.main
-
-# Re-import a resource that's existing on the current AWS
-terraform import aws_instance.main NEW_INSTANCE_ID
-
-# List all remote EC2 instances
-aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name,Tags[?Key==`Name`].Value|[0],IamInstanceProfile.Arn]' --output table
-
-# Log in to remote EC2 instance
-aws ssm start-session --target INSTANCE_ID
-
-# List all docker commands for local image building and remote image management
-cd infrastructure & terraform output docker_commands
-
-# list all ec2 remote session management commands
-cd infrastructure & terraform output connect_to_instance
-
-# Check EC2 instance status
+# Check EC2 instance status for Session Manager
 aws ssm describe-instance-information
 
-# View application logs in EC2
-aws ssm start-session --target INSTANCE_ID
+# Connect to EC2 instance
+export INSTANCE_ID=$(terraform -chdir=infrastructure output -raw instance_id)
+aws ssm start-session --target $INSTANCE_ID
+
+# View application logs (run inside EC2)
 docker logs app --tail 50
 
-# Check container status in EC2
+# Check container status (run inside EC2)
 docker ps -a
 
-# Test health endpoint in EC2
-curl http://localhost:8080/health
+# Terraform state management
+cd infrastructure
+terraform state list
+terraform state rm aws_instance.main  # Remove divergent resource
+terraform import aws_instance.main NEW_INSTANCE_ID  # Re-import existing resource
+
+# List S3 buckets
+aws s3 ls
+```
+
+## Project Structure
+
+```
+rukmer-commons/
+├── infrastructure/          # Terraform infrastructure code
+│   ├── main.tf             # Main infrastructure definitions
+│   ├── variables.tf        # Input variables
+│   ├── outputs.tf          # Output values
+│   └── terraform.tfvars    # Secret values (gitignored)
+├── src/
+│   ├── Dockerfile          # Builds production release
+│   └── marketplace-api/    # Phoenix LiveView application
+│       ├── lib/
+│       │   ├── application.ex           # App startup
+│       │   ├── repo.ex                  # Database connection
+│       │   ├── services/                # Business logic (AWS Cognito)
+│       │   └── marketplace_api_web/     # Web interface
+│       │       ├── endpoint.ex          # HTTP entry point
+│       │       ├── router.ex            # Routes
+│       │       ├── live/                # LiveView pages
+│       │       ├── components/          # Reusable UI components
+│       │       └── errors/              # Error handlers
+│       ├── config/
+│       │   ├── config.exs       # Compile-time config (dev defaults)
+│       │   └── runtime.exs      # Runtime config (prod environment vars)
+│       ├── mix.exs              # Dependencies & release config
+│       └── mix.lock             # Locked dependency versions
+├── local_deploy.sh         # Automated deployment script
+└── start_dev.sh           # Automated local development setup
 ```
 
 ## Next Steps
 
-1. Implement AWS Cognito authentication
+1. ✅ AWS Cognito authentication (implemented with Phoenix LiveView)
 2. Add S3 artifact upload functionality
 3. Create publisher and subscriber workflows
 4. Implement drone registration system
